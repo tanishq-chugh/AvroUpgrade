@@ -41,7 +41,7 @@ Avro 1.8.2 (10 April 2017)
     AVRO-1884: Java: Add method to set the compiler output suffix.
     (shijinkui via blue)
 
-    AVRO-1932: Java: Allow setting the SchemaStore on generated classes. 
+    AVRO-1932: Java: Allow setting the SchemaStore on generated classes.
     (Niels Basjes)
 
   OPTIMIZATIONS
@@ -174,7 +174,7 @@ Avro 1.8.1 (14 May 2016)
 
     AVRO-1840: Ensure that build.sh clean really cleans all generated files (nielsbasjes)
 
-    AVRO-1841: Add clientside githooks to do basic commit validation (nielsbasjes) 
+    AVRO-1841: Add clientside githooks to do basic commit validation (nielsbasjes)
 
     AVRO-1807: Java/JSON: Throw for unsupported objects rather than ignoring. (blue)
 
