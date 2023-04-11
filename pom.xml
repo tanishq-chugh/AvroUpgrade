@@ -556,14 +556,6 @@
                            includes="**/target/*${project.version}*.jar"
                            excludes="**/original-*.jar **/*tests.jar"/>
                 </copy>
-
-                <mkdir dir="${avro.docDir}"/>
-                <copy todir="${avro.docDir}/java">
-                  <fileset dir="lang/java/target/site/apidocs"/>
-                </copy>
-                <copy todir="build/avro-doc-${project.version}/trevni">
-                  <fileset dir="lang/java/trevni/doc/target/site"/>
-                </copy>
               </target>
             </configuration>
           </plugin>
