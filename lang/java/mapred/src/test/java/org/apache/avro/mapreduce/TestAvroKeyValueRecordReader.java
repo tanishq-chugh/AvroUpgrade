@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,8 +18,8 @@
 
 package org.apache.avro.mapreduce;
 
-import static org.easymock.EasyMock.*;
 import static org.junit.Assert.*;
+import static org.mockito.Mockito.*;
 
 import java.io.File;
 import java.io.IOException;
@@ -51,32 +51,27 @@ public class TestAvroKeyValueRecordReader {
   @Test
   public void testReadRecords() throws IOException, InterruptedException {
     // Create the test avro file input with two records:
-    //   1. <"firstkey", 1>
-    //   2. <"second", 2>
-    Schema keyValueSchema = AvroKeyValue.getSchema(
-        Schema.create(Schema.Type.STRING), Schema.create(Schema.Type.INT));
+    // 1. <"firstkey", 1>
+    // 2. <"second", 2>
+    Schema keyValueSchema = AvroKeyValue.getSchema(Schema.create(Schema.Type.STRING), Schema.create(Schema.Type.INT));
 
-    AvroKeyValue<CharSequence, Integer> firstInputRecord
-        = new AvroKeyValue<CharSequence, Integer>(new GenericData.Record(keyValueSchema));
+    AvroKeyValue<CharSequence, Integer> firstInputRecord = new AvroKeyValue<>(new GenericData.Record(keyValueSchema));
     firstInputRecord.setKey("first");
     firstInputRecord.setValue(1);
 
-    AvroKeyValue<CharSequence, Integer> secondInputRecord
-        = new AvroKeyValue<CharSequence, Integer>(new GenericData.Record(keyValueSchema));
+    AvroKeyValue<CharSequence, Integer> secondInputRecord = new AvroKeyValue<>(new GenericData.Record(keyValueSchema));
     secondInputRecord.setKey("second");
     secondInputRecord.setValue(2);
 
     final SeekableInput avroFileInput = new SeekableFileInput(
-        AvroFiles.createFile(new File(mTempDir.getRoot(), "myInputFile.avro"), keyValueSchema,
-            firstInputRecord.get(), secondInputRecord.get()));
+        AvroFiles.createFile(new File(mTempDir.getRoot(), "myInputFile.avro"), keyValueSchema, firstInputRecord.get(),
+            secondInputRecord.get()));
 
     // Create the record reader over the avro input file.
-    RecordReader<AvroKey<CharSequence>, AvroValue<Integer>> recordReader
-        = new AvroKeyValueRecordReader<CharSequence, Integer>(
-            Schema.create(Schema.Type.STRING), Schema.create(Schema.Type.INT)) {
+    RecordReader<AvroKey<CharSequence>, AvroValue<Integer>> recordReader = new AvroKeyValueRecordReader<CharSequence, Integer>(
+        Schema.create(Schema.Type.STRING), Schema.create(Schema.Type.INT)) {
       @Override
-      protected SeekableInput createSeekableInput(Configuration conf, Path path)
-          throws IOException {
+      protected SeekableInput createSeekableInput(Configuration conf, Path path) throws IOException {
         return avroFileInput;
       }
     };
@@ -85,22 +80,19 @@ public class TestAvroKeyValueRecordReader {
     Configuration conf = new Configuration();
 
     // Create a mock input split for this record reader.
-    FileSplit inputSplit = createMock(FileSplit.class);
-    expect(inputSplit.getPath()).andReturn(new Path("/path/to/an/avro/file")).anyTimes();
-    expect(inputSplit.getStart()).andReturn(0L).anyTimes();
-    expect(inputSplit.getLength()).andReturn(avroFileInput.length()).anyTimes();
+    FileSplit inputSplit = mock(FileSplit.class);
+    when(inputSplit.getPath()).thenReturn(new Path("/path/to/an/avro/file"));
+    when(inputSplit.getStart()).thenReturn(0L);
+    when(inputSplit.getLength()).thenReturn(avroFileInput.length());
 
     // Create a mock task attempt context for this record reader.
-    TaskAttemptContext context = createMock(TaskAttemptContext.class);
-    expect(context.getConfiguration()).andReturn(conf).anyTimes();
+    TaskAttemptContext context = mock(TaskAttemptContext.class);
+    when(context.getConfiguration()).thenReturn(conf);
 
     // Initialize the record reader.
-    replay(inputSplit);
-    replay(context);
     recordReader.initialize(inputSplit, context);
 
-    assertEquals("Progress should be zero before any records are read",
-        0.0f, recordReader.getProgress(), 0.0f);
+    assertEquals("Progress should be zero before any records are read", 0.0f, recordReader.getProgress(), 0.0f);
 
     // Some variables to hold the records.
     AvroKey<CharSequence> key;
@@ -117,8 +109,7 @@ public class TestAvroKeyValueRecordReader {
     assertEquals("first", key.datum().toString());
     assertEquals(1, value.datum().intValue());
 
-    assertTrue("getCurrentKey() returned different keys for the same record",
-        key == recordReader.getCurrentKey());
+    assertTrue("getCurrentKey() returned different keys for the same record", key == recordReader.getCurrentKey());
     assertTrue("getCurrentValue() returned different values for the same record",
         value == recordReader.getCurrentValue());
 
@@ -133,8 +124,7 @@ public class TestAvroKeyValueRecordReader {
     assertEquals("second", key.datum().toString());
     assertEquals(2, value.datum().intValue());
 
-    assertEquals("Progress should be complete (2 out of 2 records processed)",
-        1.0f, recordReader.getProgress(), 0.0f);
+    assertEquals("Progress should be complete (2 out of 2 records processed)", 1.0f, recordReader.getProgress(), 0.0f);
 
     // There should be no more records.
     assertFalse("Expected only 2 records", recordReader.nextKeyValue());
@@ -143,7 +133,9 @@ public class TestAvroKeyValueRecordReader {
     recordReader.close();
 
     // Verify the expected calls on the mocks.
-    verify(inputSplit);
-    verify(context);
+    verify(inputSplit).getPath();
+    verify(inputSplit, times(2)).getStart();
+    verify(inputSplit).getLength();
+    verify(context, atLeastOnce()).getConfiguration();
   }
 }

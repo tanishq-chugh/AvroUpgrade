@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,32 +21,26 @@
 
 #include <map>
 #include <vector>
-#include "boost/make_shared.hpp"
 
+#include "NodeImpl.hh"
 #include "Symbol.hh"
 #include "ValidSchema.hh"
-#include "NodeImpl.hh"
 
 namespace avro {
 namespace parsing {
 
 class ValidatingGrammarGenerator {
 protected:
-    template<typename T>
-    static void doFixup(Production& p, const std::map<T, ProductionPtr> &m);
+    virtual ProductionPtr doGenerate(const NodePtr &n,
+                                     std::map<NodePtr, ProductionPtr> &m);
 
-    template<typename T>
-    static void doFixup(Symbol &s, const std::map<T, ProductionPtr> &m);
-    virtual ProductionPtr doGenerate(const NodePtr& n,
-        std::map<NodePtr, ProductionPtr> &m);
+    ProductionPtr generate(const NodePtr &schema);
 
-    ProductionPtr generate(const NodePtr& schema);
 public:
-    Symbol generate(const ValidSchema& schema);
-
+    Symbol generate(const ValidSchema &schema);
 };
 
-}   // namespace parsing
-}   // namespace avro
+} // namespace parsing
+} // namespace avro
 
 #endif

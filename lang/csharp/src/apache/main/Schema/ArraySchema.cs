@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,31 +29,44 @@ namespace Avro
         /// <summary>
         /// Schema for the array 'type' attribute
         /// </summary>
-        public Schema ItemSchema { get; set;  }
+        public Schema ItemSchema { get; set; }
 
         /// <summary>
         /// Static class to return a new instance of ArraySchema
         /// </summary>
         /// <param name="jtok">JSON object for the array schema</param>
+        /// <param name="props">dictionary that provides access to custom properties</param>
         /// <param name="names">list of named schemas already parsed</param>
         /// <param name="encspace">enclosing namespace for the array schema</param>
         /// <returns></returns>
         internal static ArraySchema NewInstance(JToken jtok, PropertyMap props, SchemaNames names, string encspace)
         {
             JToken jitem = jtok["items"];
-            if (null == jitem) throw new AvroTypeException("Array does not have 'items'");
-
-            return new ArraySchema(Schema.ParseJson(jitem, names, encspace), props);
+            if (null == jitem) throw new AvroTypeException($"Array does not have 'items' at '{jtok.Path}'");
+            var schema = Schema.ParseJson(jitem, names, encspace);
+            return new ArraySchema(schema, props);
         }
 
         /// <summary>
-        /// Constructor
+        /// Creates a new <see cref="ArraySchema"/>
         /// </summary>
-        /// <param name="items">schema for the array items type</param>
-        private ArraySchema(Schema items, PropertyMap props) : base(Type.Array, props)
+        /// <param name="items">Schema for the array items type</param>
+        /// <param name="customAttributes">Dictionary that provides access to custom properties</param>
+        /// <returns></returns>
+        public static ArraySchema Create(Schema items, PropertyMap customAttributes = null)
         {
-            if (null == items) throw new ArgumentNullException("items");
-            this.ItemSchema = items;
+            return new ArraySchema(items, customAttributes);
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ArraySchema"/> class.
+        /// </summary>
+        /// <param name="items">Schema for the array items type</param>
+        /// <param name="customAttributes">Dictionary that provides access to custom properties</param>
+        private ArraySchema(Schema items, PropertyMap customAttributes)
+            : base(Type.Array, customAttributes)
+        {
+            ItemSchema = items ?? throw new ArgumentNullException(nameof(items));
         }
 
         /// <summary>

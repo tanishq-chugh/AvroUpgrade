@@ -16,7 +16,7 @@ Avro provides:
 * Remote procedure call (RPC).
 
 This document will focus on the C implementation of Avro.  To learn more about
-Avro in general, http://avro.apache.org/[visit the Avro website].
+Avro in general, https://avro.apache.org/[visit the Avro website].
 
 == Introduction to Avro C 
 
@@ -60,14 +60,14 @@ To learn about the API, take a look at the examples and reference files
 later in this document.
 
 We're always looking for contributions so, if you're a C hacker, please
-feel free to http://avro.apache.org/[submit patches to the project].
+feel free to https://avro.apache.org/[submit patches to the project].
 
 
 == Error reporting
 
 Most functions in the Avro C library return a single +int+ status code.
 Following the POSIX _errno.h_ convention, a status code of 0 indicates
-success.  Non-zero codes indiciate an error condition.  Some functions
+success.  Non-zero codes indicate an error condition.  Some functions
 return a pointer value instead of an +int+ status code; for these
 functions, a +NULL+ pointer indicates an error.
 

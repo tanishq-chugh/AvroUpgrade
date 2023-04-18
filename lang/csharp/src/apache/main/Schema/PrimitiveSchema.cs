@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,8 +16,7 @@
  * limitations under the License.
  */
 using System;
-using System.Collections.Generic;
-using System.Text;
+using System.Linq;
 using Newtonsoft.Json;
 
 namespace Avro
@@ -31,19 +30,38 @@ namespace Avro
         /// Constructor for primitive schema
         /// </summary>
         /// <param name="type"></param>
-        private PrimitiveSchema(Type type, PropertyMap props) : base(type, props)
+        /// <param name="customProperties">dictionary that provides access to custom properties</param>
+        private PrimitiveSchema(Type type, PropertyMap customProperties)
+            : base(type, customProperties)
         {
+        }
+
+        /// <summary>
+        /// Creates a new instance of <see cref="PrimitiveSchema"/>
+        /// </summary>
+        /// <param name="type">The primitive type to create</param>
+        /// <param name="customProperties">Dictionary that provides access to custom properties</param>
+        /// <returns></returns>
+        public static PrimitiveSchema Create(Type type, PropertyMap customProperties = null)
+        {
+            return new PrimitiveSchema(type, customProperties);
         }
 
         /// <summary>
         /// Static function to return new instance of primitive schema
         /// </summary>
         /// <param name="type">primitive type</param>
+        /// <param name="props">dictionary that provides access to custom properties</param>
         /// <returns></returns>
         public static PrimitiveSchema NewInstance(string type, PropertyMap props = null)
         {
             const string q = "\"";
-            if (type.StartsWith(q) && type.EndsWith(q)) type = type.Substring(1, type.Length - 2);
+            if (type.StartsWith(q, StringComparison.Ordinal)
+                && type.EndsWith(q, StringComparison.Ordinal))
+            {
+                type = type.Substring(1, type.Length - 2);
+            }
+
             switch (type)
             {
                 case "null":
@@ -75,7 +93,22 @@ namespace Avro
         /// <param name="encspace"></param>
         protected internal override void WriteJson(JsonTextWriter w, SchemaNames names, string encspace)
         {
-            w.WriteValue(Name);
+            if(this.Props?.Any() == true)
+            {
+                w.WriteStartObject();
+                w.WritePropertyName("type");
+                w.WriteValue(Name);
+                foreach(var prop in Props)
+                {
+                    w.WritePropertyName(prop.Key);
+                    w.WriteRawValue(prop.Value);
+                }
+                w.WriteEndObject();
+            }
+            else
+            {
+                w.WriteValue(Name);
+            }
         }
 
         /// <summary>
@@ -125,6 +158,26 @@ namespace Avro
         public override int GetHashCode()
         {
             return 13 * Tag.GetHashCode() + getHashCode(Props);
+        }
+
+        /// <summary>
+        /// Returns the canonical JSON representation of this schema.
+        /// </summary>
+        /// <returns>The canonical JSON representation of this schema.</returns>
+        public override string ToString()
+        {
+            using (System.IO.StringWriter sw = new System.IO.StringWriter())
+            using (Newtonsoft.Json.JsonTextWriter writer = new Newtonsoft.Json.JsonTextWriter(sw))
+            {
+                writer.WriteStartObject();
+                writer.WritePropertyName("type");
+
+                WriteJson(writer, new SchemaNames(), null); // stand alone schema, so no enclosing name space
+
+                writer.WriteEndObject();
+
+                return sw.ToString();
+            }
         }
     }
 }

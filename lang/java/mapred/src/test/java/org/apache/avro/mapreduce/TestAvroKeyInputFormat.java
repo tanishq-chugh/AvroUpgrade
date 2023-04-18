@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,7 +19,7 @@
 package org.apache.avro.mapreduce;
 
 import static org.junit.Assert.*;
-import static org.easymock.EasyMock.*;
+import static org.mockito.Mockito.*;
 
 import java.io.IOException;
 
@@ -35,31 +35,26 @@ import org.junit.Test;
 
 public class TestAvroKeyInputFormat {
   /**
-   * Verifies that a non-null record reader can be created, and the key/value types are
-   * as expected.
+   * Verifies that a non-null record reader can be created, and the key/value
+   * types are as expected.
    */
   @Test
   public void testCreateRecordReader() throws IOException, InterruptedException {
     // Set up the job configuration.
-    Job job = new Job();
+    Job job = Job.getInstance();
     AvroJob.setInputKeySchema(job, Schema.create(Schema.Type.STRING));
     Configuration conf = job.getConfiguration();
 
-    FileSplit inputSplit = createMock(FileSplit.class);
-    TaskAttemptContext context = createMock(TaskAttemptContext.class);
-    expect(context.getConfiguration()).andReturn(conf).anyTimes();
-
-    replay(inputSplit);
-    replay(context);
+    FileSplit inputSplit = mock(FileSplit.class);
+    TaskAttemptContext context = mock(TaskAttemptContext.class);
+    when(context.getConfiguration()).thenReturn(conf);
 
     AvroKeyInputFormat inputFormat = new AvroKeyInputFormat();
     @SuppressWarnings("unchecked")
-    RecordReader<AvroKey<Object>, NullWritable> recordReader = inputFormat.createRecordReader(
-        inputSplit, context);
+    RecordReader<AvroKey<Object>, NullWritable> recordReader = inputFormat.createRecordReader(inputSplit, context);
     assertNotNull(inputFormat);
     recordReader.close();
 
-    verify(inputSplit);
-    verify(context);
+    verify(context).getConfiguration();
   }
 }

@@ -9,7 +9,7 @@
  *  "License"); you may not use this file except in compliance
  *  with the License.  You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ *  https://www.apache.org/licenses/LICENSE-2.0
  *
  *  Unless required by applicable law or agreed to in writing, software
  *  distributed under the License is distributed on an "AS IS" BASIS,
@@ -310,7 +310,7 @@ MessageEmitter.prototype._createHandshakeRequest = function (
   return new HandshakeRequest(
     getHash(this._ptcl),
     noPtcl ? null : {string: this._ptcl.toString()},
-    new Buffer(hashString, 'binary')
+    Buffer.from(hashString, 'binary')
   );
 };
 
@@ -413,7 +413,7 @@ StatelessEmitter.prototype._emit = function (message, req, cb) {
   emit(false);
 
   function emit(retry) {
-    var tap = new Tap(new Buffer(self._bufferSize));
+    var tap = new Tap(Buffer.alloc(self._bufferSize));
 
     var handshakeReq = self._createHandshakeRequest(serverHashString, !retry);
     safeWrite(tap, HANDSHAKE_REQUEST_TYPE, handshakeReq);
@@ -444,6 +444,7 @@ StatelessEmitter.prototype._emit = function (message, req, cb) {
           }
 
           var tap = new Tap(buf);
+          var args;
           try {
             var info = self._finalizeHandshake(tap, handshakeReq);
             serverHashString = info.serverHashString;
@@ -452,7 +453,7 @@ StatelessEmitter.prototype._emit = function (message, req, cb) {
               return;
             }
             self._idType._read(tap); // Skip metadata.
-            var args = self._decodeArguments(tap, serverHashString, message);
+            args = self._decodeArguments(tap, serverHashString, message);
           } catch (err) {
             done(err);
             return;
@@ -547,8 +548,9 @@ function StatefulEmitter(ptcl, readable, writable, opts) {
 
   function onHandshakeData(buf) {
     var tap = new Tap(buf);
+    var info;
     try {
-      var info = self._finalizeHandshake(tap, handshakeReq);
+      info = self._finalizeHandshake(tap, handshakeReq);
     } catch (err) {
       self.emit('error', err);
       self.destroy(); // This isn't a recoverable error.
@@ -568,8 +570,9 @@ function StatefulEmitter(ptcl, readable, writable, opts) {
 
   function onMessageData(buf) {
     var tap = new Tap(buf);
+    var id;
     try {
-      var id = self._idType._read(tap);
+      id = self._idType._read(tap);
       if (!id) {
         throw new Error('missing ID');
       }
@@ -584,8 +587,9 @@ function StatefulEmitter(ptcl, readable, writable, opts) {
       return;
     }
 
+    var args;
     try {
-      var args = self._decodeArguments(
+      args = self._decodeArguments(
         tap,
         self._serverHashString,
         info.message
@@ -615,7 +619,7 @@ StatefulEmitter.prototype._emit = function (message, req, cb) {
     return;
   }
 
-  var tap = new Tap(new Buffer(this._bufferSize));
+  var tap = new Tap(Buffer.alloc(this._bufferSize));
   var id = this._id++;
   try {
     safeWrite(tap, this._idType, -id);
@@ -701,9 +705,11 @@ MessageListener.prototype._validateHandshake = function (reqTap, resTap) {
   // occurs when parsing the request, a response with match NONE will be sent.
   // Also emits 'handshake' event with both the request and the response.
   var validationErr = null;
+  var handshakeReq;
+  var serverHashString;
   try {
-    var handshakeReq = HANDSHAKE_REQUEST_TYPE._read(reqTap);
-    var serverHashString = handshakeReq.serverHash.toString('binary');
+    handshakeReq = HANDSHAKE_REQUEST_TYPE._read(reqTap);
+    serverHashString = handshakeReq.serverHash.toString('binary');
   } catch (err) {
     validationErr = err;
   }
@@ -734,7 +740,7 @@ MessageListener.prototype._validateHandshake = function (reqTap, resTap) {
     validationErr ? 'NONE' : serverMatch ? 'BOTH' : 'CLIENT',
     serverMatch ? null : {string: this._ptcl.toString()},
     serverMatch ? null : {'org.apache.avro.ipc.MD5': getHash(this._ptcl)},
-    validationErr ? {map: {error: new Buffer(validationErr.message)}} : null
+    validationErr ? {map: {error: Buffer.from(validationErr.message)}} : null
   );
 
   this.emit('handshake', handshakeReq, handshakeRes);
@@ -801,7 +807,7 @@ MessageListener.prototype.destroy = function (noWait) {
 function StatelessListener(ptcl, readableFactory, opts) {
   MessageListener.call(this, ptcl, opts);
 
-  this._tap = new Tap(new Buffer(this._bufferSize));
+  this._tap = new Tap(Buffer.alloc(this._bufferSize));
   this._message = undefined;
 
   var self = this;
@@ -827,14 +833,16 @@ function StatelessListener(ptcl, readableFactory, opts) {
       return;
     }
 
+    var name;
+    var req;
     try {
       self._idType._read(reqTap); // Skip metadata.
-      var name = STRING_TYPE._read(reqTap);
+      name = STRING_TYPE._read(reqTap);
       self._message = self._ptcl._messages[name];
       if (!self._message) {
         throw new Error(f('unknown message: %s', name));
       }
-      var req = self._decodeRequest(reqTap, self._message);
+      req = self._decodeRequest(reqTap, self._message);
     } catch (err) {
       onResponse(err);
       return;
@@ -884,7 +892,7 @@ function StatefulListener(ptcl, readable, writable, opts) {
 
   function onHandshakeData(buf) {
     var reqTap = new Tap(buf);
-    var resTap = new Tap(new Buffer(self._bufferSize));
+    var resTap = new Tap(Buffer.alloc(self._bufferSize));
     if (self._validateHandshake(reqTap, resTap)) {
       self._decoder
         .removeListener('data', onHandshakeData)
@@ -895,7 +903,7 @@ function StatefulListener(ptcl, readable, writable, opts) {
 
   function onRequestData(buf) {
     var reqTap = new Tap(buf);
-    var resTap = new Tap(new Buffer(self._bufferSize));
+    var resTap = new Tap(Buffer.alloc(self._bufferSize));
     var id = 0;
     try {
       id = -self._idType._read(reqTap) | 0;
@@ -908,13 +916,16 @@ function StatefulListener(ptcl, readable, writable, opts) {
     }
 
     self._pending++;
+    var name;
+    var message;
+    var req;
     try {
-      var name = STRING_TYPE._read(reqTap);
-      var message = self._ptcl._messages[name];
+      name = STRING_TYPE._read(reqTap);
+      message = self._ptcl._messages[name];
       if (!message) {
         throw new Error('unknown message: ' + name);
       }
-      var req = self._decodeRequest(reqTap, message);
+      req = self._decodeRequest(reqTap, message);
     } catch (err) {
       onResponse(err);
       return;
@@ -1038,7 +1049,7 @@ MessageEncoder.prototype._transform = function (buf, encoding, cb) {
  */
 function MessageDecoder(noEmpty) {
   stream.Transform.call(this);
-  this._buf = new Buffer(0);
+  this._buf = Buffer.alloc(0);
   this._bufs = [];
   this._length = 0;
   this._empty = !!noEmpty;
@@ -1088,6 +1099,8 @@ MessageDecoder.prototype._flush = function () {
     this.emit('error', new Error('trailing data'));
   } else if (this._empty) {
     this.emit('error', new Error('no message decoded'));
+  } else {
+    this.emit('finish');
   }
 };
 
@@ -1125,7 +1138,7 @@ IdType.createMetadataType = function (Type) {
  *
  */
 function intBuffer(n) {
-  var buf = new Buffer(4);
+  var buf = Buffer.alloc(4);
   buf.writeInt32BE(n);
   return buf;
 }
@@ -1143,7 +1156,7 @@ function safeWrite(tap, type, val) {
   type._write(tap, val);
 
   if (!tap.isValid()) {
-    var buf = new Buffer(tap.pos);
+    var buf = Buffer.alloc(tap.pos);
     tap.buf.copy(buf, 0, 0, pos);
     tap.buf = buf;
     tap.pos = pos;
@@ -1202,7 +1215,7 @@ function asyncAvroCb(ctx, cb, err, res) {
  *
  */
 function getHash(ptcl) {
-  return new Buffer(ptcl._hashString, 'binary');
+  return Buffer.from(ptcl._hashString, 'binary');
 }
 
 /**

@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,36 +20,29 @@
 #define avro_ResolverSchema_hh__
 
 #include <boost/noncopyable.hpp>
-#include <boost/shared_ptr.hpp>
-#include <stdint.h>
+#include <cstdint>
+#include <memory>
 
 #include "Config.hh"
-#include "Boost.hh"
 #include "Reader.hh"
 
 /// \file ResolverSchema.hh
 ///
 
 namespace avro {
-    
+
 class ValidSchema;
 class Layout;
 class Resolver;
 
 class AVRO_DECL ResolverSchema {
-
-  public:
-
+public:
     ResolverSchema(const ValidSchema &writer, const ValidSchema &reader, const Layout &readerLayout);
 
-  private:
-
+private:
     friend class ResolvingReader;
-
-    void parse(Reader &reader, uint8_t *address); 
-
-    boost::shared_ptr<Resolver> resolver_;
-
+    void parse(Reader &reader, uint8_t *address);
+    std::shared_ptr<Resolver> resolver_;
 };
 
 } // namespace avro

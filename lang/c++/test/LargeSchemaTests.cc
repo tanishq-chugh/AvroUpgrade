@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,17 +16,15 @@
  * limitations under the License.
  */
 
-#include <fstream>
 #include "Compiler.hh"
-#include "ValidSchema.hh"
 #include "Decoder.hh"
+#include "ValidSchema.hh"
+#include <fstream>
 
-#include <boost/test/included/unit_test_framework.hpp>
-#include <boost/test/unit_test.hpp>
+#include <boost/test/included/unit_test.hpp>
 #include <boost/test/parameterized_test.hpp>
 
-void testLargeSchema()
-{
+void testLargeSchema() {
     std::ifstream in("jsonschemas/large_schema.avsc");
     avro::ValidSchema vs;
     avro::compileJsonSchema(in, vs);
@@ -35,12 +33,11 @@ void testLargeSchema()
     avro::DecoderPtr rd = avro::resolvingDecoder(vs, vs, d);
 }
 
-boost::unit_test::test_suite*
-init_unit_test_suite(int argc, char* argv[]) 
-{
+boost::unit_test::test_suite *
+init_unit_test_suite(int /*argc*/, char * /*argv*/[]) {
     using namespace boost::unit_test;
 
-    test_suite* ts= BOOST_TEST_SUITE("Avro C++ unit tests for schemas");
+    auto *ts = BOOST_TEST_SUITE("Avro C++ unit tests for schemas");
     ts->add(BOOST_TEST_CASE(&testLargeSchema));
     return ts;
 }

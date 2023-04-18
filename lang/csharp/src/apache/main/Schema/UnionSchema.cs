@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,9 +17,8 @@
  */
 using System;
 using System.Collections.Generic;
-using System.Text;
+using System.Linq;
 using Newtonsoft.Json.Linq;
-using Newtonsoft.Json;
 
 namespace Avro
 {
@@ -42,6 +41,7 @@ namespace Avro
         /// Static function to return instance of the union schema
         /// </summary>
         /// <param name="jarr">JSON object for the union schema</param>
+        /// <param name="props">dictionary that provides access to custom properties</param>
         /// <param name="names">list of named schemas already read</param>
         /// <param name="encspace">enclosing namespace of the schema</param>
         /// <returns>new UnionSchema object</returns>
@@ -54,27 +54,40 @@ namespace Avro
             {
                 Schema unionType = Schema.ParseJson(jvalue, names, encspace);
                 if (null == unionType)
-                    throw new SchemaParseException("Invalid JSON in union" + jvalue.ToString());
+                    throw new SchemaParseException($"Invalid JSON in union {jvalue.ToString()} at '{jvalue.Path}'");
 
-                string name = unionType.Name;
+                string name = unionType.Fullname;
                 if (uniqueSchemas.ContainsKey(name))
-                    throw new SchemaParseException("Duplicate type in union: " + name);
+                    throw new SchemaParseException($"Duplicate type in union: {name} at '{jvalue.Path}'");
 
                 uniqueSchemas.Add(name, name);
                 schemas.Add(unionType);
             }
-
             return new UnionSchema(schemas, props);
+        }
+
+        /// <summary>
+        /// Creates a new <see cref="UnionSchema"/>
+        /// </summary>
+        /// <param name="schemas">The union schemas</param>
+        /// <param name="customProperties">Dictionary that provides access to custom properties</param>
+        /// <returns>New <see cref="UnionSchema"/></returns>
+        public static UnionSchema Create(List<Schema> schemas, PropertyMap customProperties = null)
+        {
+            return new UnionSchema(schemas, customProperties);
         }
 
         /// <summary>
         /// Contructor for union schema
         /// </summary>
         /// <param name="schemas"></param>
-        private UnionSchema(List<Schema> schemas, PropertyMap props) : base(Type.Union, props)
+        /// <param name="customProperties">dictionary that provides access to custom properties</param>
+        private UnionSchema(List<Schema> schemas, PropertyMap customProperties)
+            : base(Type.Union, customProperties)
         {
             if (schemas == null)
-                throw new ArgumentNullException("schemas");
+                throw new ArgumentNullException(nameof(schemas));
+            VerifyChildSchemas(schemas);
             this.Schemas = schemas;
         }
 
@@ -114,8 +127,21 @@ namespace Avro
         {
             if (s is UnionSchema) throw new AvroException("Cannot find a match against union schema");
             // Try exact match.
-            //for (int i = 0; i < Count; i++) if (Schemas[i].Equals(s)) return i; // removed this for performance's sake
-            for (int i = 0; i < Count; i++) if (Schemas[i].CanRead(s)) return i;
+            // CanRead might find a compatible schema which can read. e.g. double and long
+            for (int i = 0; i < Count; i++)
+            {
+                if (Schemas[i].Equals(s))
+                {
+                    return i;
+                }
+            }
+            for (int i = 0; i < Count; i++)
+            {
+                if (Schemas[i].CanRead(s))
+                {
+                    return i;
+                }
+            }
             return -1;
         }
 
@@ -159,6 +185,21 @@ namespace Avro
             foreach (Schema schema in Schemas) result += 89 * schema.GetHashCode();
             result += getHashCode(Props);
             return result;
+        }
+
+        private void VerifyChildSchemas(List<Schema> schemas)
+        {
+            if (schemas.Any(schema => schema.Tag == Type.Union))
+            {
+                throw new ArgumentException("Unions may not immediately contain other unions", nameof(schemas));
+            }
+
+            IGrouping<string, Schema> duplicateType = schemas.GroupBy(schema => schema.Fullname).FirstOrDefault(x => x.Count() > 1);
+
+            if (duplicateType != null)
+            {
+                throw new ArgumentException($"Duplicate type in union: {duplicateType.Key}");
+            }
         }
     }
 }

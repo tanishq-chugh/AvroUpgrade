@@ -7,7 +7,7 @@
 # (the "License"); you may not use this file except in compliance with
 # the License.  You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+#     https://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,35 +18,48 @@
 set -e
 
 # connect to avro ruby root directory
-cd `dirname "$0"`
+cd "$(dirname "$0")"
 
 # maintain our gems here
-export GEM_HOME=.gem/
-export PATH="$PATH:.gem/bin"
+export GEM_HOME="$PWD/.gem/"
+export PATH="/usr/local/rbenv/shims:$GEM_HOME/bin:$PATH"
 
-# bootstrap bundler
-gem install --no-rdoc --no-ri bundler
 bundle install
 
-case "$1" in
-     test)
-        bundle exec rake test
-       ;;
+for target in "$@"
+do
+  case "$target" in
+    lint)
+      bundle exec rubocop
+      ;;
 
-     dist)
-        bundle exec rake dist
-       ;;
+    interop-data-generate)
+      bundle exec rake generate_interop
+      ;;
 
-     clean)
-        bundle install
-        bundle exec rake clean
-        rm -rf tmp avro.gemspec data.avr
-       ;;
+    interop-data-test)
+      bundle exec rake interop
+      ;;
 
-     *)
-       echo "Usage: $0 {test|dist|clean}"
-       exit 1
+    test)
+      bundle exec rake test
+      ;;
 
-esac
+    dist)
+      bundle exec rake build
+      DIST="../../dist/ruby"
+      mkdir -p "${DIST}"
+      VERSION=$(cat lib/avro/VERSION.txt)
+      cp "pkg/avro-${VERSION}.gem" "${DIST}"
+      ;;
 
-exit 0
+    clean)
+      bundle exec rake clean
+      rm -rf tmp data.avr lib/avro/VERSION.txt
+      ;;
+
+    *)
+      echo "Usage: $0 {clean|dist|interop-data-generate|interop-data-test|lint|test}"
+      exit 1
+  esac
+done

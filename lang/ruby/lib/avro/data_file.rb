@@ -1,3 +1,4 @@
+# frozen_string_literal: true
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -5,9 +6,9 @@
 # to you under the Apache License, Version 2.0 (the
 # "License"); you may not use this file except in compliance
 # with the License.  You may obtain a copy of the License at
-# 
-# http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
+# https://www.apache.org/licenses/LICENSE-2.0
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -25,7 +26,7 @@ module Avro
     SYNC_SIZE = 16
     SYNC_INTERVAL = 4000 * SYNC_SIZE
     META_SCHEMA = Schema.parse('{"type": "map", "values": "bytes"}')
-    VALID_ENCODINGS = ['binary'] # not used yet
+    VALID_ENCODINGS = ['binary'].freeze # not used yet
 
     class DataFileError < AvroError; end
 
@@ -99,7 +100,7 @@ module Avro
         @encoder = IO::BinaryEncoder.new(@writer)
         @datum_writer = datum_writer
         @meta = meta
-        @buffer_writer = StringIO.new('', 'w')
+        @buffer_writer = StringIO.new(+'', 'w')
         @buffer_writer.set_encoding('BINARY') if @buffer_writer.respond_to?(:set_encoding)
         @buffer_encoder = IO::BinaryEncoder.new(@buffer_writer)
         @block_count = 0
@@ -316,7 +317,7 @@ module Avro
       def decompress(compressed)
         # Passing a negative number to Inflate puts it into "raw" RFC1951 mode
         # (without the RFC1950 header & checksum). See the docs for
-        # inflateInit2 in http://www.zlib.net/manual.html
+        # inflateInit2 in https://www.zlib.net/manual.html
         zstream = Zlib::Inflate.new(-Zlib::MAX_WBITS)
         data = zstream.inflate(compressed)
         data << zstream.finish
@@ -372,9 +373,32 @@ module Avro
       end
     end
 
+    class ZstandardCodec
+      def codec_name; 'zstandard'; end
+
+      def decompress(data)
+        load_zstandard!
+        Zstd.decompress(data)
+      end
+
+      def compress(data)
+        load_zstandard!
+        Zstd.compress(data)
+      end
+
+      private
+
+      def load_zstandard!
+        require 'zstd-ruby' unless defined?(Zstd)
+      rescue LoadError
+        raise LoadError, "Zstandard compression is not available, please install the `zstd-ruby` gem."
+      end
+    end
+
     DataFile.register_codec NullCodec
     DataFile.register_codec DeflateCodec
     DataFile.register_codec SnappyCodec
+    DataFile.register_codec ZstandardCodec
 
     # TODO this constant won't be updated if you register another codec.
     # Deprecated in favor of Avro::DataFile::codecs

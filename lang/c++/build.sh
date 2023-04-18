@@ -7,7 +7,7 @@
 # (the "License"); you may not use this file except in compliance with
 # the License.  You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+#     https://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,7 +18,7 @@
 set -e # exit on error
 
 function usage {
-  echo "Usage: $0 {test|dist|clean|install|doc}"
+  echo "Usage: $0 {lint|test|dist|clean|install|doc|format}"
   exit 1
 }
 
@@ -44,10 +44,6 @@ DOC_CPP=$BUILD/$AVRO_DOC/api/cpp
 DIST_DIR=../../dist/cpp
 TARFILE=../dist/cpp/$AVRO_CPP.tar.gz
 
-(mkdir -p build; cd build; cmake -G "Unix Makefiles" ..)
-for target in "$@"
-do
-
 function do_doc() {
   doxygen
   if [ -d doc ]
@@ -58,11 +54,12 @@ function do_doc() {
     exit 1
   fi
 }
+
 function do_dist() {
   rm -rf $BUILD_CPP/
   mkdir -p $BUILD_CPP
   cp -r api AUTHORS build.sh CMakeLists.txt ChangeLog \
-    LICENSE NOTICE impl jsonschemas NEWS parser README scripts test examples \
+    LICENSE NOTICE impl jsonschemas NEWS parser README test examples \
     $BUILD_CPP
   find $BUILD_CPP -name '.svn' | xargs rm -rf
   cp ../../share/VERSION.txt $BUILD_CPP
@@ -74,9 +71,19 @@ function do_dist() {
   fi
 }
 
+(mkdir -p build; cd build; cmake --version; cmake -G "Unix Makefiles" ..)
+for target in "$@"
+do
+
 case "$target" in
+  lint)
+    # some versions of cppcheck seem to require an explicit
+    # "--error-exitcode" option to return non-zero code
+    cppcheck --error-exitcode=1 --inline-suppr -f -q -x c++ api examples impl test
+    ;;
+
   test)
-    (cd build && cmake -G "Unix Makefiles" -D CMAKE_BUILD_TYPE=Debug .. && make && cd .. \
+    (cd build && cmake -G "Unix Makefiles" -D CMAKE_BUILD_TYPE=Debug -D AVRO_ADD_PROTECTOR_FLAGS=1 .. && make && cd .. \
       && ./build/buffertest \
       && ./build/unittest \
       && ./build/CodecTests \
@@ -86,6 +93,14 @@ case "$target" in
       && ./build/AvrogencppTests \
       && ./build/DataFileTests   \
       && ./build/SchemaTests)
+    ;;
+
+  xcode-test)
+    mkdir -p build.xcode
+    (cd build.xcode \
+        && cmake -G Xcode .. \
+        && xcodebuild -configuration Release \
+        && ctest -C Release)
     ;;
 
   dist)
@@ -98,9 +113,13 @@ case "$target" in
     do_doc
     ;;
 
+  format)
+    clang-format -i --style file `find api -type f` `find impl -type f` `find test -type f`
+    ;;
+
   clean)
     (cd build && make clean)
-    rm -rf doc test.avro test6.df
+    rm -rf doc test.avro test?.df test??.df test_skip.df test_lastSync.df test_readRecordUsingLastSync.df
     ;;
 
   install)

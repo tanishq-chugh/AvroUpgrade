@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,113 +17,70 @@
  */
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.CodeDom.Compiler;
-using Microsoft.CSharp;
+using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
-using Avro.Specific;
 
-namespace Avro.Test
+namespace Avro.Test.CodeGen
 {
     [TestFixture]
- 
-    class CodeGenTest
+    class CodeGenTests
     {
-        [TestCase(@"{
-""type"" : ""record"",
-""name"" : ""ClassKeywords"",
-""namespace"" : ""com.base"",
-""fields"" : 
-		[ 	
-			{ ""name"" : ""int"", ""type"" : ""int"" },
-			{ ""name"" : ""base"", ""type"" : ""long"" },
-			{ ""name"" : ""event"", ""type"" : ""boolean"" },
-			{ ""name"" : ""foreach"", ""type"" : ""double"" },
-			{ ""name"" : ""bool"", ""type"" : ""float"" },
-			{ ""name"" : ""internal"", ""type"" : ""bytes"" },
-			{ ""name"" : ""while"", ""type"" : ""string"" },
-			{ ""name"" : ""return"", ""type"" : ""null"" },
-			{ ""name"" : ""enum"", ""type"" : { ""type"" : ""enum"", ""name"" : ""class"", ""symbols"" : [ ""A"", ""B"" ] } },
-			{ ""name"" : ""string"", ""type"" : { ""type"": ""fixed"", ""size"": 16, ""name"": ""static"" } }
-		]
-}
-", new object[] {"com.base.ClassKeywords", typeof(int), typeof(long), typeof(bool), typeof(double), typeof(float), typeof(byte[]), typeof(string),typeof(object),"com.base.class", "com.base.static"})]
-        [TestCase(@"{
-""type"" : ""record"",
-""name"" : ""SchemaObject"",
-""namespace"" : ""schematest"",
-""fields"" : 
-	[ 	
-		{ ""name"" : ""myobject"", ""type"" : 
-			[ 
-				""null"", 
-				{""type"" : ""array"", ""items"" : [ ""null"", 
-											{ ""type"" : ""enum"", ""name"" : ""MyEnum"", ""symbols"" : [ ""A"", ""B"" ] },
-											{ ""type"": ""fixed"", ""size"": 16, ""name"": ""MyFixed"" } 
-											]
-				}
-			]
-		}
-	]
-}
-", new object[] { "schematest.SchemaObject", typeof(IList<object>) })]
-        public static void TestCodeGen(string str, object[] result)
+
+        [Test]
+        public void TestGetNullableTypeException()
         {
-            Schema schema = Schema.Parse(str);
-
-            CompilerResults compres = GenerateSchema(schema);
-
-            // instantiate object
-            ISpecificRecord rec = compres.CompiledAssembly.CreateInstance((string)result[0]) as ISpecificRecord;
-            Assert.IsNotNull(rec);
-
-            // test type of each fields
-            for (int i = 1; i < result.Length; ++i)
-            {
-                object field = rec.Get(i - 1);
-                Type stype;
-                if (result[i].GetType() == typeof(string))
-                {
-                    object obj = compres.CompiledAssembly.CreateInstance((string)result[i]);
-                    Assert.IsNotNull(obj);
-                    stype = obj.GetType();
-                }
-                else
-                    stype = (Type)result[i];
-                if (!stype.IsValueType)
-                    Assert.IsNull(field);   // can't test reference type, it will be null
-                else
-                    Assert.AreEqual(stype, field.GetType());
-            }
+            Assert.Throws<ArgumentNullException>(() => Avro.CodeGen.GetNullableType(null));
         }
 
-
-        private static CompilerResults GenerateSchema(Schema schema)
+        [Test]
+        public void TestReservedKeywords()
         {
-            var codegen = new CodeGen();
-            codegen.AddSchema(schema);
-            return GenerateAssembly(codegen);
+            // https://github.com/dotnet/roslyn/blob/main/src/Compilers/CSharp/Portable/Syntax/SyntaxKindFacts.cs
+
+            // Check if all items in CodeGenUtil.Instance.ReservedKeywords are keywords
+            foreach (string keyword in CodeGenUtil.Instance.ReservedKeywords)
+            {
+                Assert.That(SyntaxFacts.GetKeywordKind(keyword) != SyntaxKind.None, Is.True);
+            }
+
+            // Check if all Roslyn defined keywords are in CodeGenUtil.Instance.ReservedKeywords
+            foreach (SyntaxKind keywordKind in SyntaxFacts.GetReservedKeywordKinds())
+            {
+                Assert.That(CodeGenUtil.Instance.ReservedKeywords, Does.Contain(SyntaxFacts.GetText(keywordKind)));
+            }
+
+            // If this test fails, CodeGenUtil.ReservedKeywords list must be updated.
+            // This might happen if newer version of C# language defines new reserved keywords.
         }
 
-        private static CompilerResults GenerateAssembly(CodeGen schema)
+        [TestCase("a", "a")]
+        [TestCase("a.b", "a.b")]
+        [TestCase("a.b.c", "a.b.c")]
+        [TestCase("int", "@int")]
+        [TestCase("a.long.b", "a.@long.b")]
+        [TestCase("int.b.c", "@int.b.c")]
+        [TestCase("a.b.int", "a.b.@int")]
+        [TestCase("int.long.while", "@int.@long.@while")] // Reserved keywords
+        [TestCase("a.value.partial", "a.value.partial")] // Contextual keywords
+        [TestCase("a.value.b.int.c.while.longpartial", "a.value.b.@int.c.@while.longpartial")] // Reserved and contextual keywords
+        public void TestMangleUnMangle(string input, string mangled)
         {
-            var compileUnit = schema.GenerateCode();
+            // Mangle
+            Assert.That(CodeGenUtil.Instance.Mangle(input), Is.EqualTo(mangled));
+            // Unmangle
+            Assert.That(CodeGenUtil.Instance.UnMangle(mangled), Is.EqualTo(input));
+        }
 
-            var comparam = new CompilerParameters(new string[] { "mscorlib.dll" });
-            comparam.ReferencedAssemblies.Add("System.dll");
-            comparam.ReferencedAssemblies.Add("Avro.dll");
-            comparam.GenerateInMemory = true;
-            var ccp = new CSharpCodeProvider();
-            var units = new[] { compileUnit };
-            var compres = ccp.CompileAssemblyFromDom(comparam, units);
-            if (compres.Errors.Count > 0)
+        [TestFixture]
+        public class CodeGenTestClass : Avro.CodeGen
+        {
+            [Test]
+            public void TestGenerateNamesException()
             {
-                for (int i = 0; i < compres.Errors.Count; i++)
-                    Console.WriteLine(compres.Errors[i]);
+                Protocol protocol = null;
+                Assert.Throws<ArgumentNullException>(() => this.GenerateNames(protocol));
             }
-            Assert.AreEqual(0, compres.Errors.Count);
-            return compres;
         }
     }
 }

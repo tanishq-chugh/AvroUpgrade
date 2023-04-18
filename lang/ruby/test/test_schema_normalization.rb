@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# frozen_string_literal: true
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -7,7 +8,7 @@
 # "License"); you may not use this file except in compliance
 # with the License.  You may obtain a copy of the License at
 #
-# http://www.apache.org/licenses/LICENSE-2.0
+# https://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -166,6 +167,7 @@ class TestSchemaNormalization < Test::Unit::TestCase
     CaseFinder.cases.each do |test_case|
       schema = Avro::Schema.parse(test_case.input)
       assert_equal test_case.canonical, Avro::SchemaNormalization.to_parsing_form(schema)
+      assert_equal test_case.fingerprint, schema.crc_64_avro_fingerprint
     end
   end
 end

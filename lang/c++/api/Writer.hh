@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,29 +19,26 @@
 #ifndef avro_Writer_hh__
 #define avro_Writer_hh__
 
+#include <array>
 #include <boost/noncopyable.hpp>
 
 #include "Config.hh"
-#include "buffer/Buffer.hh"
-#include "Zigzag.hh"
 #include "Types.hh"
 #include "Validator.hh"
+#include "Zigzag.hh"
+#include "buffer/Buffer.hh"
 
 namespace avro {
 
 /// Class for writing avro data to a stream.
 
 template<class ValidatorType>
-class WriterImpl : private boost::noncopyable
-{
+class WriterImpl : private boost::noncopyable {
 
-  public:
+public:
+    WriterImpl() = default;
 
-    WriterImpl() {}
-
-    explicit WriterImpl(const ValidSchema &schema) :
-        validator_(schema) 
-    {}
+    explicit WriterImpl(const ValidSchema &schema) : validator_(schema) {}
 
     void writeValue(const Null &) {
         validator_.checkTypeExpected(AVRO_NULL);
@@ -55,7 +52,8 @@ class WriterImpl : private boost::noncopyable
 
     void writeValue(int32_t val) {
         validator_.checkTypeExpected(AVRO_INT);
-        boost::array<uint8_t, 5> bytes;
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+        std::array<uint8_t, 5> bytes;
         size_t size = encodeInt32(val, bytes);
         buffer_.writeTo(reinterpret_cast<const char *>(bytes.data()), size);
     }
@@ -71,7 +69,7 @@ class WriterImpl : private boost::noncopyable
             float f;
             int32_t i;
         } v;
-    
+
         v.f = val;
         buffer_.writeTo(v.i);
     }
@@ -82,7 +80,7 @@ class WriterImpl : private boost::noncopyable
             double d;
             int64_t i;
         } v;
-        
+
         v.d = val;
         buffer_.writeTo(v.i);
     }
@@ -97,14 +95,14 @@ class WriterImpl : private boost::noncopyable
         putBytes(val, size);
     }
 
-    template <size_t N>
+    template<size_t N>
     void writeFixed(const uint8_t (&val)[N]) {
         validator_.checkFixedSizeExpected(N);
         buffer_.writeTo(reinterpret_cast<const char *>(val), N);
     }
 
-    template <size_t N>
-    void writeFixed(const boost::array<uint8_t, N> &val) {
+    template<size_t N>
+    void writeFixed(const std::array<uint8_t, N> &val) {
         validator_.checkFixedSizeExpected(val.size());
         buffer_.writeTo(reinterpret_cast<const char *>(val.data()), val.size());
     }
@@ -153,10 +151,10 @@ class WriterImpl : private boost::noncopyable
         return buffer_;
     }
 
-  private:
-
+private:
     void putLong(int64_t val) {
-        boost::array<uint8_t, 10> bytes;
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+        std::array<uint8_t, 10> bytes;
         size_t size = encodeInt64(val, bytes);
         buffer_.writeTo(reinterpret_cast<const char *>(bytes.data()), size);
     }
@@ -174,11 +172,10 @@ class WriterImpl : private boost::noncopyable
 
     ValidatorType validator_;
     OutputBuffer buffer_;
-
 };
 
-typedef WriterImpl<NullValidator> Writer;
-typedef WriterImpl<Validator> ValidatingWriter;
+using Writer = WriterImpl<NullValidator>;
+using ValidatingWriter = WriterImpl<Validator>;
 
 } // namespace avro
 

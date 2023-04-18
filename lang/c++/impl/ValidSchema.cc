@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,38 +17,41 @@
  */
 
 #include <boost/format.hpp>
+#include <cctype>
 #include <sstream>
+#include <utility>
 
-#include "ValidSchema.hh"
-#include "Schema.hh"
 #include "Node.hh"
+#include "Schema.hh"
+#include "ValidSchema.hh"
 
-using std::string;
-using std::make_pair;
 using boost::format;
-using boost::shared_ptr;
-using boost::static_pointer_cast;
+using std::make_pair;
+using std::ostringstream;
+using std::shared_ptr;
+using std::static_pointer_cast;
+using std::string;
 
 namespace avro {
+using SymbolMap = std::map<Name, NodePtr>;
 
-typedef std::map<Name, NodePtr> SymbolMap;
-
-static bool validate(const NodePtr &node, SymbolMap &symbolMap) 
-{
-    if (! node->isValid()) {
+static bool validate(const NodePtr &node, SymbolMap &symbolMap) {
+    if (!node->isValid()) {
         throw Exception(format("Schema is invalid, due to bad node of type %1%")
-            % node->type());
+                        % node->type());
     }
 
     if (node->hasName()) {
-        const Name& nm = node->name();
-        SymbolMap::iterator it = symbolMap.find(nm);
-        bool found = it != symbolMap.end() && nm == it->first;
+        const Name &nm = node->name();
+        // FIXME: replace "find" with "lower_bound". The author seems to have intended
+        // "lower_bound" here because of (1) the check for the contents of the iterator
+        // that follows and (2) use of the iterator in insert later in the code.
+        auto it = symbolMap.find(nm);
+        auto found = it != symbolMap.end() && nm == it->first;
 
         if (node->type() == AVRO_SYMBOLIC) {
-            if (! found) {
-                throw Exception(format("Symbolic name \"%1%\" is unknown") %
-                    node->name());
+            if (!found) {
+                throw Exception(format("Symbolic name \"%1%\" is unknown") % node->name());
             }
 
             shared_ptr<NodeSymbolic> symNode =
@@ -70,14 +73,14 @@ static bool validate(const NodePtr &node, SymbolMap &symbolMap)
     for (size_t i = 0; i < leaves; ++i) {
         const NodePtr &leaf(node->leafAt(i));
 
-        if (! validate(leaf, symbolMap)) {
+        if (!validate(leaf, symbolMap)) {
 
             // if validate returns false it means a node with this name already
             // existed in the map, instead of keeping this node twice in the
             // map (which could potentially create circular shared pointer
-            // links that could not be easily freed), replace this node with a
+            // links that would not be freed), replace this node with a
             // symbolic link to the original one.
-            
+
             node->setLeafToSymbolic(i, symbolMap.find(leaf->name())->second);
         }
     }
@@ -85,46 +88,94 @@ static bool validate(const NodePtr &node, SymbolMap &symbolMap)
     return true;
 }
 
-static void validate(const NodePtr& p)
-{
+static void validate(const NodePtr &p) {
     SymbolMap m;
     validate(p, m);
 }
 
-ValidSchema::ValidSchema(const NodePtr &root) : root_(root)
-{
+ValidSchema::ValidSchema(NodePtr root) : root_(std::move(root)) {
     validate(root_);
 }
 
-ValidSchema::ValidSchema(const Schema &schema) : root_(schema.root())
-{
+ValidSchema::ValidSchema(const Schema &schema) : root_(schema.root()) {
     validate(root_);
 }
 
-ValidSchema::ValidSchema() : root_(NullSchema().root()) 
-{
+ValidSchema::ValidSchema() : root_(NullSchema().root()) {
     validate(root_);
 }
 
-void
-ValidSchema::setSchema(const Schema &schema)
-{
+void ValidSchema::setSchema(const Schema &schema) {
     root_ = schema.root();
     validate(root_);
 }
 
-void 
-ValidSchema::toJson(std::ostream &os) const
-{ 
+void ValidSchema::toJson(std::ostream &os) const {
     root_->printJson(os, 0);
     os << '\n';
 }
 
-void 
-ValidSchema::toFlatList(std::ostream &os) const
-{ 
+string
+ValidSchema::toJson(bool prettyPrint) const {
+    ostringstream oss;
+    toJson(oss);
+    if (!prettyPrint) {
+        return compactSchema(oss.str());
+    }
+    return oss.str();
+}
+
+void ValidSchema::toFlatList(std::ostream &os) const {
     root_->printBasicInfo(os);
 }
 
-} // namespace avro
+/*
+ * compactSchema compacts and returns a formatted string representation
+ * of a ValidSchema object by removing the whitespaces outside of the quoted
+ * field names and values. It can handle the cases where the quoted value is
+ * in UTF-8 format. Note that this method is not responsible for validating
+ * the schema.
+ */
+string ValidSchema::compactSchema(const string &schema) {
+    auto insideQuote = false;
+    size_t newPos = 0;
+    string data = schema;
 
+    for (auto c : schema) {
+        if (!insideQuote && std::isspace(c)) {
+            // Skip the white spaces outside quotes.
+            continue;
+        }
+
+        if (c == '\"') {
+            // It is valid for a quote to be part of the value for some fields,
+            // e.g., the "doc" field.  In that case, the quote is expected to be
+            // escaped inside the schema.  Since the escape character '\\' could
+            // be escaped itself, we need to check whether there are an even
+            // number of consecutive slashes prior to the quote.
+            auto leadingSlashes = 0;
+            for (int i = static_cast<int>(newPos) - 1; i >= 0; i--) {
+                if (data[i] == '\\') {
+                    leadingSlashes++;
+                } else {
+                    break;
+                }
+            }
+            if (leadingSlashes % 2 == 0) {
+                // Found a real quote which identifies either the start or the
+                // end of a field name or value.
+                insideQuote = !insideQuote;
+            }
+        }
+        data[newPos++] = c;
+    }
+    if (insideQuote) {
+        throw Exception("Schema is not well formed with mismatched quotes");
+    }
+    if (newPos < schema.size()) {
+        data.resize(newPos);
+    }
+    return data;
+}
+
+} // namespace avro
