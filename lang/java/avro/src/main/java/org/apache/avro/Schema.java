@@ -635,7 +635,7 @@ public abstract class Schema extends JsonProperties implements Serializable {
       return defaultValue != null;
     }
 
-    JsonNode defaultValue() {
+    public JsonNode defaultValue() {
       return defaultValue;
     }
 
