@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,8 +18,8 @@
 
 package org.apache.avro.mapreduce;
 
-import static org.easymock.EasyMock.*;
 import static org.junit.Assert.*;
+import static org.mockito.Mockito.*;
 
 import java.io.File;
 import java.io.IOException;
@@ -49,19 +49,17 @@ public class TestAvroKeyRecordReader {
   @Test
   public void testReadRecords() throws IOException, InterruptedException {
     // Create the test avro file input with two records:
-    //   1. "first"
-    //   2. "second"
-    final SeekableInput avroFileInput = new SeekableFileInput(
-        AvroFiles.createFile(new File(mTempDir.getRoot(), "myStringfile.avro"),
-            Schema.create(Schema.Type.STRING), "first", "second"));
+    // 1. "first"
+    // 2. "second"
+    final SeekableInput avroFileInput = new SeekableFileInput(AvroFiles.createFile(
+        new File(mTempDir.getRoot(), "myStringfile.avro"), Schema.create(Schema.Type.STRING), "first", "second"));
 
     // Create the record reader.
     Schema readerSchema = Schema.create(Schema.Type.STRING);
-    RecordReader<AvroKey<CharSequence>, NullWritable> recordReader
-        = new AvroKeyRecordReader<CharSequence>(readerSchema) {
+    RecordReader<AvroKey<CharSequence>, NullWritable> recordReader = new AvroKeyRecordReader<CharSequence>(
+        readerSchema) {
       @Override
-      protected SeekableInput createSeekableInput(Configuration conf, Path path)
-          throws IOException {
+      protected SeekableInput createSeekableInput(Configuration conf, Path path) throws IOException {
         return avroFileInput;
       }
     };
@@ -70,22 +68,19 @@ public class TestAvroKeyRecordReader {
     Configuration conf = new Configuration();
 
     // Create a mock input split for this record reader.
-    FileSplit inputSplit = createMock(FileSplit.class);
-    expect(inputSplit.getPath()).andReturn(new Path("/path/to/an/avro/file")).anyTimes();
-    expect(inputSplit.getStart()).andReturn(0L).anyTimes();
-    expect(inputSplit.getLength()).andReturn(avroFileInput.length()).anyTimes();
+    FileSplit inputSplit = mock(FileSplit.class);
+    when(inputSplit.getPath()).thenReturn(new Path("/path/to/an/avro/file"));
+    when(inputSplit.getStart()).thenReturn(0L);
+    when(inputSplit.getLength()).thenReturn(avroFileInput.length());
 
     // Create a mock task attempt context for this record reader.
-    TaskAttemptContext context = createMock(TaskAttemptContext.class);
-    expect(context.getConfiguration()).andReturn(conf).anyTimes();
+    TaskAttemptContext context = mock(TaskAttemptContext.class);
+    when(context.getConfiguration()).thenReturn(conf);
 
     // Initialize the record reader.
-    replay(inputSplit);
-    replay(context);
     recordReader.initialize(inputSplit, context);
 
-    assertEquals("Progress should be zero before any records are read",
-        0.0f, recordReader.getProgress(), 0.0f);
+    assertEquals("Progress should be zero before any records are read", 0.0f, recordReader.getProgress(), 0.0f);
 
     // Some variables to hold the records.
     AvroKey<CharSequence> key;
@@ -102,8 +97,7 @@ public class TestAvroKeyRecordReader {
     CharSequence firstString = key.datum();
     assertEquals("first", firstString.toString());
 
-    assertTrue("getCurrentKey() returned different keys for the same record",
-        key == recordReader.getCurrentKey());
+    assertTrue("getCurrentKey() returned different keys for the same record", key == recordReader.getCurrentKey());
     assertTrue("getCurrentValue() returned different values for the same record",
         value == recordReader.getCurrentValue());
 
@@ -118,8 +112,7 @@ public class TestAvroKeyRecordReader {
     CharSequence secondString = key.datum();
     assertEquals("second", secondString.toString());
 
-    assertEquals("Progress should be complete (2 out of 2 records processed)",
-        1.0f, recordReader.getProgress(), 0.0f);
+    assertEquals("Progress should be complete (2 out of 2 records processed)", 1.0f, recordReader.getProgress(), 0.0f);
 
     // There should be no more records.
     assertFalse("Expected only 2 records", recordReader.nextKeyValue());
@@ -128,7 +121,9 @@ public class TestAvroKeyRecordReader {
     recordReader.close();
 
     // Verify the expected calls on the mocks.
-    verify(inputSplit);
-    verify(context);
+    verify(inputSplit).getPath();
+    verify(inputSplit, times(2)).getStart();
+    verify(inputSplit).getLength();
+    verify(context, atLeastOnce()).getConfiguration();
   }
 }

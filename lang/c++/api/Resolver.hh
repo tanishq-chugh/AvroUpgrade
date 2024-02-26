@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,7 +20,8 @@
 #define avro_Resolver_hh__
 
 #include <boost/noncopyable.hpp>
-#include <stdint.h>
+#include <cstdint>
+#include <memory>
 
 #include "Config.hh"
 #include "Reader.hh"
@@ -32,24 +33,17 @@ namespace avro {
 
 class ValidSchema;
 class Layout;
-    
-class AVRO_DECL Resolver : private boost::noncopyable
-{
 
-  public:
-
+class AVRO_DECL Resolver : private boost::noncopyable {
+public:
     virtual void parse(Reader &reader, uint8_t *address) const = 0;
-    virtual ~Resolver() {}
-
+    virtual ~Resolver() = default;
 };
 
-Resolver *constructResolver(
-        const ValidSchema &rwriterSchema,
-        const ValidSchema &readerSchema,
-        const Layout &readerLayout
-    );
-
-
+std::unique_ptr<Resolver> constructResolver(
+    const ValidSchema &writerSchema,
+    const ValidSchema &readerSchema,
+    const Layout &readerLayout);
 
 } // namespace avro
 

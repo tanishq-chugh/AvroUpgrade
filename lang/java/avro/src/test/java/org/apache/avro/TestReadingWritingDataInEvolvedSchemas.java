@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,12 +19,14 @@ package org.apache.avro;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Collection;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericData.EnumSymbol;
 import org.apache.avro.generic.GenericData.Record;
@@ -36,10 +38,15 @@ import org.apache.avro.io.Decoder;
 import org.apache.avro.io.DecoderFactory;
 import org.apache.avro.io.Encoder;
 import org.apache.avro.io.EncoderFactory;
+import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
+@RunWith(Parameterized.class)
 public class TestReadingWritingDataInEvolvedSchemas {
 
   private static final String RECORD_A = "RecordA";
@@ -80,17 +87,60 @@ public class TestReadingWritingDataInEvolvedSchemas {
       .endRecord();
   private static final Schema UNION_STRING_BYTES_RECORD = SchemaBuilder.record(RECORD_A) //
       .fields() //
-      .name(FIELD_A).type().unionOf().stringType().and().bytesType().endUnion()
-      .noDefault() //
+      .name(FIELD_A).type().unionOf().stringType().and().bytesType().endUnion().noDefault() //
       .endRecord();
+
+  private static final Schema ENUM_AB = SchemaBuilder.enumeration("Enum1").symbols("A", "B");
+
   private static final Schema ENUM_AB_RECORD = SchemaBuilder.record(RECORD_A) //
       .fields() //
-      .name(FIELD_A).type().enumeration("Enum1").symbols("A", "B").noDefault() //
+      .name(FIELD_A).type(ENUM_AB).noDefault() //
       .endRecord();
+
+  private static final Schema ENUM_ABC = SchemaBuilder.enumeration("Enum1").symbols("A", "B", "C");
   private static final Schema ENUM_ABC_RECORD = SchemaBuilder.record(RECORD_A) //
       .fields() //
-      .name(FIELD_A).type().enumeration("Enum1").symbols("A", "B", "C").noDefault() //
+      .name(FIELD_A).type(ENUM_ABC).noDefault() //
       .endRecord();
+  private static final Schema UNION_INT_RECORD = SchemaBuilder.record(RECORD_A) //
+      .fields() //
+      .name(FIELD_A).type().unionOf().intType().endUnion().noDefault() //
+      .endRecord();
+  private static final Schema UNION_LONG_RECORD = SchemaBuilder.record(RECORD_A) //
+      .fields() //
+      .name(FIELD_A).type().unionOf().longType().endUnion().noDefault() //
+      .endRecord();
+  private static final Schema UNION_FLOAT_RECORD = SchemaBuilder.record(RECORD_A) //
+      .fields() //
+      .name(FIELD_A).type().unionOf().floatType().endUnion().noDefault() //
+      .endRecord();
+  private static final Schema UNION_DOUBLE_RECORD = SchemaBuilder.record(RECORD_A) //
+      .fields() //
+      .name(FIELD_A).type().unionOf().doubleType().endUnion().noDefault() //
+      .endRecord();
+  private static final Schema UNION_LONG_FLOAT_RECORD = SchemaBuilder.record(RECORD_A) //
+      .fields() //
+      .name(FIELD_A).type().unionOf().floatType().and().longType().endUnion().noDefault() //
+      .endRecord();
+  private static final Schema UNION_FLOAT_DOUBLE_RECORD = SchemaBuilder.record(RECORD_A) //
+      .fields() //
+      .name(FIELD_A).type().unionOf().floatType().and().doubleType().endUnion().noDefault() //
+      .endRecord();
+
+  @Parameters(name = "encoder = {0}")
+  public static Collection<Object[]> data() {
+    return Arrays.asList(new EncoderType[][] { { EncoderType.BINARY }, { EncoderType.JSON } });
+  }
+
+  public TestReadingWritingDataInEvolvedSchemas(EncoderType encoderType) {
+    this.encoderType = encoderType;
+  }
+
+  private final EncoderType encoderType;
+
+  enum EncoderType {
+    BINARY, JSON
+  }
 
   @Test
   public void doubleWrittenWithUnionSchemaIsConvertedToDoubleSchema() throws Exception {
@@ -99,6 +149,87 @@ public class TestReadingWritingDataInEvolvedSchemas {
     byte[] encoded = encodeGenericBlob(record);
     Record decoded = decodeGenericBlob(DOUBLE_RECORD, writer, encoded);
     assertEquals(42.0, decoded.get(FIELD_A));
+  }
+
+  @Test
+  public void longWrittenWithUnionSchemaIsConvertedToUnionLongFloatSchema() throws Exception {
+    Schema writer = UNION_LONG_RECORD;
+    Record record = defaultRecordWithSchema(writer, FIELD_A, 42L);
+    byte[] encoded = encodeGenericBlob(record);
+    Record decoded = decodeGenericBlob(UNION_LONG_FLOAT_RECORD, writer, encoded);
+    assertEquals(42L, decoded.get(FIELD_A));
+  }
+
+  @Test
+  public void longWrittenWithUnionSchemaIsConvertedToDoubleSchema() throws Exception {
+    Schema writer = UNION_LONG_RECORD;
+    Record record = defaultRecordWithSchema(writer, FIELD_A, 42L);
+    byte[] encoded = encodeGenericBlob(record);
+    Record decoded = decodeGenericBlob(UNION_DOUBLE_RECORD, writer, encoded);
+    assertEquals(42.0, decoded.get(FIELD_A));
+  }
+
+  @Test
+  public void intWrittenWithUnionSchemaIsConvertedToDoubleSchema() throws Exception {
+    Schema writer = UNION_INT_RECORD;
+    Record record = defaultRecordWithSchema(writer, FIELD_A, 42);
+    byte[] encoded = encodeGenericBlob(record);
+    Record decoded = decodeGenericBlob(UNION_DOUBLE_RECORD, writer, encoded);
+    assertEquals(42.0, decoded.get(FIELD_A));
+  }
+
+  @Test
+  public void intWrittenWithUnionSchemaIsReadableByFloatSchema() throws Exception {
+    Schema writer = UNION_INT_RECORD;
+    Record record = defaultRecordWithSchema(writer, FIELD_A, 42);
+    byte[] encoded = encodeGenericBlob(record);
+    Record decoded = decodeGenericBlob(FLOAT_RECORD, writer, encoded);
+    assertEquals(42.0f, decoded.get(FIELD_A));
+  }
+
+  @Test
+  public void intWrittenWithUnionSchemaIsReadableByFloatUnionSchema() throws Exception {
+    Schema writer = UNION_INT_RECORD;
+    Record record = defaultRecordWithSchema(writer, FIELD_A, 42);
+    byte[] encoded = encodeGenericBlob(record);
+    Record decoded = decodeGenericBlob(UNION_FLOAT_RECORD, writer, encoded);
+    assertEquals(42.0f, decoded.get(FIELD_A));
+  }
+
+  @Test
+  public void longWrittenWithUnionSchemaIsReadableByFloatSchema() throws Exception {
+    Schema writer = UNION_LONG_RECORD;
+    Record record = defaultRecordWithSchema(writer, FIELD_A, 42L);
+    byte[] encoded = encodeGenericBlob(record);
+    Record decoded = decodeGenericBlob(FLOAT_RECORD, writer, encoded);
+    assertEquals(42.0f, decoded.get(FIELD_A));
+  }
+
+  @Test
+  public void longWrittenWithUnionSchemaIsReadableByFloatUnionSchema() throws Exception {
+    Schema writer = UNION_LONG_RECORD;
+    Record record = defaultRecordWithSchema(writer, FIELD_A, 42L);
+    byte[] encoded = encodeGenericBlob(record);
+    Record decoded = decodeGenericBlob(UNION_FLOAT_RECORD, writer, encoded);
+    assertEquals(42.0f, decoded.get(FIELD_A));
+  }
+
+  @Test
+  public void longWrittenWithUnionSchemaIsConvertedToLongFloatUnionSchema() throws Exception {
+    Schema writer = UNION_LONG_RECORD;
+    Record record = defaultRecordWithSchema(writer, FIELD_A, 42L);
+    byte[] encoded = encodeGenericBlob(record);
+    Record decoded = decodeGenericBlob(UNION_LONG_FLOAT_RECORD, writer, encoded);
+    assertEquals(42L, decoded.get(FIELD_A));
+  }
+
+  @Test
+  public void longWrittenWithUnionSchemaIsConvertedToFloatDoubleUnionSchema() throws Exception {
+    Schema writer = UNION_LONG_RECORD;
+    Record record = defaultRecordWithSchema(writer, FIELD_A, 42L);
+    byte[] encoded = encodeGenericBlob(record);
+    Record decoded = decodeGenericBlob(UNION_FLOAT_DOUBLE_RECORD, writer, encoded);
+    assertEquals(42.0F, decoded.get(FIELD_A));
   }
 
   @Test
@@ -148,7 +279,7 @@ public class TestReadingWritingDataInEvolvedSchemas {
     Record record = defaultRecordWithSchema(writer, FIELD_A, "42");
     byte[] encoded = encodeGenericBlob(record);
     ByteBuffer actual = (ByteBuffer) decodeGenericBlob(BYTES_RECORD, writer, encoded).get(FIELD_A);
-    assertArrayEquals("42".getBytes("UTF-8"), actual.array());
+    assertArrayEquals("42".getBytes(StandardCharsets.UTF_8), actual.array());
   }
 
   @Test
@@ -158,16 +289,16 @@ public class TestReadingWritingDataInEvolvedSchemas {
     Record record = defaultRecordWithSchema(writer, FIELD_A, goeran);
     byte[] encoded = encodeGenericBlob(record);
     ByteBuffer actual = (ByteBuffer) decodeGenericBlob(BYTES_RECORD, writer, encoded).get(FIELD_A);
-    assertArrayEquals(goeran.getBytes("UTF-8"), actual.array());
+    assertArrayEquals(goeran.getBytes(StandardCharsets.UTF_8), actual.array());
   }
 
   @Test
   public void asciiBytesWrittenWithUnionSchemaIsConvertedToStringSchema() throws Exception {
     Schema writer = UNION_STRING_BYTES_RECORD;
-    ByteBuffer buf = ByteBuffer.wrap("42".getBytes("UTF-8"));
+    ByteBuffer buf = ByteBuffer.wrap("42".getBytes(StandardCharsets.UTF_8));
     Record record = defaultRecordWithSchema(writer, FIELD_A, buf);
     byte[] encoded = encodeGenericBlob(record);
-    CharSequence read =  (CharSequence) decodeGenericBlob(STRING_RECORD, writer, encoded).get(FIELD_A);
+    CharSequence read = (CharSequence) decodeGenericBlob(STRING_RECORD, writer, encoded).get(FIELD_A);
     assertEquals("42", read.toString());
   }
 
@@ -177,14 +308,14 @@ public class TestReadingWritingDataInEvolvedSchemas {
     Schema writer = UNION_STRING_BYTES_RECORD;
     Record record = defaultRecordWithSchema(writer, FIELD_A, goeran);
     byte[] encoded = encodeGenericBlob(record);
-    CharSequence read =  (CharSequence) decodeGenericBlob(STRING_RECORD, writer, encoded).get(FIELD_A);
+    CharSequence read = (CharSequence) decodeGenericBlob(STRING_RECORD, writer, encoded).get(FIELD_A);
     assertEquals(goeran, read.toString());
   }
 
   @Test
   public void enumRecordCanBeReadWithExtendedEnumSchema() throws Exception {
     Schema writer = ENUM_AB_RECORD;
-    Record record = defaultRecordWithSchema(writer, FIELD_A, new EnumSymbol(writer, "A"));
+    Record record = defaultRecordWithSchema(writer, FIELD_A, new EnumSymbol(ENUM_AB, "A"));
     byte[] encoded = encodeGenericBlob(record);
     Record decoded = decodeGenericBlob(ENUM_ABC_RECORD, writer, encoded);
     assertEquals("A", decoded.get(FIELD_A).toString());
@@ -193,7 +324,7 @@ public class TestReadingWritingDataInEvolvedSchemas {
   @Test
   public void enumRecordWithExtendedSchemaCanBeReadWithOriginalEnumSchemaIfOnlyOldValues() throws Exception {
     Schema writer = ENUM_ABC_RECORD;
-    Record record = defaultRecordWithSchema(writer, FIELD_A, new EnumSymbol(writer, "A"));
+    Record record = defaultRecordWithSchema(writer, FIELD_A, new EnumSymbol(ENUM_ABC, "A"));
     byte[] encoded = encodeGenericBlob(record);
     Record decoded = decodeGenericBlob(ENUM_AB_RECORD, writer, encoded);
     assertEquals("A", decoded.get(FIELD_A).toString());
@@ -204,7 +335,7 @@ public class TestReadingWritingDataInEvolvedSchemas {
     expectedException.expect(AvroTypeException.class);
     expectedException.expectMessage("No match for C");
     Schema writer = ENUM_ABC_RECORD;
-    Record record = defaultRecordWithSchema(writer, FIELD_A, new EnumSymbol(writer, "C"));
+    Record record = defaultRecordWithSchema(writer, FIELD_A, new EnumSymbol(ENUM_ABC, "C"));
     byte[] encoded = encodeGenericBlob(record);
     decodeGenericBlob(ENUM_AB_RECORD, writer, encoded);
   }
@@ -221,7 +352,12 @@ public class TestReadingWritingDataInEvolvedSchemas {
     byte[] encoded = encodeGenericBlob(record);
     Record decoded = decodeGenericBlob(INT_RECORD, writer, encoded);
     assertEquals(42, decoded.get(FIELD_A));
-    assertNull(decoded.get("newTopField"));
+    try {
+      decoded.get("newTopField");
+      Assert.fail("get should throw a exception");
+    } catch (AvroRuntimeException ex) {
+      Assert.assertEquals("Not a valid schema field: newTopField", ex.getMessage());
+    }
   }
 
   @Test
@@ -252,33 +388,48 @@ public class TestReadingWritingDataInEvolvedSchemas {
     assertEquals(314, decoded.get("newFieldWithDefault"));
   }
 
+  @Test
+  public void aliasesInSchema() throws Exception {
+    Schema writer = new Schema.Parser()
+        .parse("{\"namespace\": \"example.avro\", \"type\": \"record\", \"name\": \"User\", \"fields\": ["
+            + "{\"name\": \"name\", \"type\": \"int\"}\n" + "]}\n");
+    Schema reader = new Schema.Parser()
+        .parse("{\"namespace\": \"example.avro\", \"type\": \"record\", \"name\": \"User\", \"fields\": ["
+            + "{\"name\": \"fname\", \"type\": \"int\", \"aliases\" : [ \"name\" ]}\n" + "]}\n");
+
+    GenericData.Record record = defaultRecordWithSchema(writer, "name", 1);
+    byte[] encoded = encodeGenericBlob(record);
+    GenericData.Record decoded = decodeGenericBlob(reader, reader, encoded);
+
+    assertEquals(1, decoded.get("fname"));
+  }
+
   private <T> Record defaultRecordWithSchema(Schema schema, String key, T value) {
     Record data = new GenericData.Record(schema);
     data.put(key, value);
     return data;
   }
 
-  private static byte[] encodeGenericBlob(GenericRecord data)
-      throws IOException {
-    DatumWriter<GenericRecord> writer = new GenericDatumWriter<GenericRecord>(data.getSchema());
+  private byte[] encodeGenericBlob(GenericRecord data) throws IOException {
+    DatumWriter<GenericRecord> writer = new GenericDatumWriter<>(data.getSchema());
     ByteArrayOutputStream outStream = new ByteArrayOutputStream();
-    Encoder encoder = EncoderFactory.get().binaryEncoder(outStream, null);
+    Encoder encoder = encoderType == EncoderType.BINARY ? EncoderFactory.get().binaryEncoder(outStream, null)
+        : EncoderFactory.get().jsonEncoder(data.getSchema(), outStream);
     writer.write(data, encoder);
     encoder.flush();
     outStream.close();
     return outStream.toByteArray();
   }
 
-  private static Record decodeGenericBlob(Schema expectedSchema, Schema schemaOfBlob, byte[] blob) throws IOException {
+  private Record decodeGenericBlob(Schema expectedSchema, Schema schemaOfBlob, byte[] blob) throws IOException {
     if (blob == null) {
       return null;
     }
-    GenericDatumReader<Record> reader = new GenericDatumReader<Record>();
+    GenericDatumReader<Record> reader = new GenericDatumReader<>();
     reader.setExpected(expectedSchema);
     reader.setSchema(schemaOfBlob);
-    Decoder decoder = DecoderFactory.get().binaryDecoder(blob, null);
-    Record data = null;
-    data = reader.read(null, decoder);
-    return data;
+    Decoder decoder = encoderType == EncoderType.BINARY ? DecoderFactory.get().binaryDecoder(blob, null)
+        : DecoderFactory.get().jsonDecoder(schemaOfBlob, new ByteArrayInputStream(blob));
+    return reader.read(null, decoder);
   }
 }

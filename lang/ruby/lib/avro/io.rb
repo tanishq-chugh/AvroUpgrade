@@ -1,3 +1,4 @@
+# frozen_string_literal: true
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -5,9 +6,9 @@
 # to you under the Apache License, Version 2.0 (the
 # "License"); you may not use this file except in compliance
 # with the License.  You may obtain a copy of the License at
-# 
-# http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
+# https://www.apache.org/licenses/LICENSE-2.0
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -43,9 +44,9 @@ module Avro
       end
 
       def byte!
-        @reader.read(1).unpack('C').first
+        @reader.readbyte
       end
-      
+
       def read_null
         # null is written as zero byte's
         nil
@@ -76,7 +77,7 @@ module Avro
         # The float is converted into a 32-bit integer using a method
         # equivalent to Java's floatToIntBits and then encoded in
         # little-endian format.
-        @reader.read(4).unpack('e')[0]
+        read_and_unpack(4, 'e')
       end
 
       def read_double
@@ -84,7 +85,7 @@ module Avro
         # The double is converted into a 64-bit integer using a method
         # equivalent to Java's doubleToLongBits and then encoded in
         # little-endian format.
-        @reader.read(8).unpack('E')[0]
+        read_and_unpack(8, 'E')
       end
 
       def read_bytes
@@ -97,7 +98,7 @@ module Avro
         # A string is encoded as a long followed by that many bytes of
         # UTF-8 encoded character data.
         read_bytes.tap do |string|
-          string.force_encoding("UTF-8") if string.respond_to? :force_encoding
+          string.force_encoding('UTF-8') if string.respond_to? :force_encoding
         end
       end
 
@@ -144,6 +145,23 @@ module Avro
       def skip(n)
         reader.seek(reader.tell() + n)
       end
+
+      private
+
+      # Optimize unpacking strings when `unpack1` is available (ruby >= 2.4)
+      if String.instance_methods.include?(:unpack1)
+
+        def read_and_unpack(byte_count, format)
+          @reader.read(byte_count).unpack1(format)
+        end
+
+      else
+
+        def read_and_unpack(byte_count, format)
+          @reader.read(byte_count).unpack(format)[0]
+        end
+
+      end
     end
 
     # Write leaf values
@@ -155,11 +173,11 @@ module Avro
       end
 
       # null is written as zero bytes
-      def write_null(datum)
+      def write_null(_datum)
         nil
       end
 
-      # a boolean is written as a single byte 
+      # a boolean is written as a single byte
       # whose value is either 0 (false) or 1 (true).
       def write_boolean(datum)
         on_disk = datum ? 1.chr : 0.chr
@@ -175,7 +193,6 @@ module Avro
       # int and long values are written using variable-length,
       # zig-zag coding.
       def write_long(n)
-        foo = n
         n = (n << 1) ^ (n >> 63)
         while (n & ~0x7F) != 0
           @writer.write(((n & 0x7f) | 0x80).chr)
@@ -221,46 +238,7 @@ module Avro
 
     class DatumReader
       def self.match_schemas(writers_schema, readers_schema)
-        w_type = writers_schema.type_sym
-        r_type = readers_schema.type_sym
-
-        # This conditional is begging for some OO love.
-        if w_type == :union || r_type == :union
-          return true
-        end
-
-        if w_type == r_type
-          return true if Schema::PRIMITIVE_TYPES_SYM.include?(r_type)
-
-          case r_type
-          when :record
-            return writers_schema.fullname == readers_schema.fullname
-          when :error
-            return writers_schema.fullname == readers_schema.fullname
-          when :request
-            return true
-          when :fixed
-            return writers_schema.fullname == readers_schema.fullname &&
-                   writers_schema.size == readers_schema.size
-          when :enum
-            return writers_schema.fullname == readers_schema.fullname
-          when :map
-            return writers_schema.values.type == readers_schema.values.type
-          when :array
-            return writers_schema.items.type == readers_schema.items.type
-          end
-        end
-
-        # Handle schema promotion
-        if w_type == :int && [:long, :float, :double].include?(r_type)
-          return true
-        elsif w_type == :long && [:float, :double].include?(r_type)
-          return true
-        elsif w_type == :float && r_type == :double
-          return true
-        end
-
-        return false
+        Avro::SchemaCompatibility.match_schemas(writers_schema, readers_schema)
       end
 
       attr_accessor :writers_schema, :readers_schema
@@ -293,7 +271,7 @@ module Avro
 
         # function dispatch for reading data based on type of writer's
         # schema
-        case writers_schema.type_sym
+        datum = case writers_schema.type_sym
         when :null;    decoder.read_null
         when :boolean; decoder.read_boolean
         when :string;  decoder.read_string
@@ -311,9 +289,11 @@ module Avro
         else
           raise AvroError, "Cannot read unknown schema type: #{writers_schema.type}"
         end
+
+        readers_schema.type_adapter.decode(datum)
       end
 
-      def read_fixed(writers_schema, readers_schema, decoder)
+      def read_fixed(writers_schema, _readers_schema, decoder)
         decoder.read(writers_schema.size)
       end
 
@@ -321,12 +301,12 @@ module Avro
         index_of_symbol = decoder.read_int
         read_symbol = writers_schema.symbols[index_of_symbol]
 
-        # TODO(jmhodges): figure out what unset means for resolution
-        # schema resolution
-        unless readers_schema.symbols.include?(read_symbol)
-          # 'unset' here
+        if !readers_schema.symbols.include?(read_symbol) && readers_schema.default
+          read_symbol = readers_schema.default
         end
 
+        # This implementation deviates from the spec by always returning
+        # a symbol.
         read_symbol
       end
 
@@ -336,7 +316,7 @@ module Avro
         while block_count != 0
           if block_count < 0
             block_count = -block_count
-            block_size = decoder.read_long
+            _block_size = decoder.read_long
           end
           block_count.times do
             read_items << read_data(writers_schema.items,
@@ -355,7 +335,7 @@ module Avro
         while block_count != 0
           if block_count < 0
             block_count = -block_count
-            block_size = decoder.read_long
+            _block_size = decoder.read_long
           end
           block_count.times do
             key = decoder.read_string
@@ -380,26 +360,28 @@ module Avro
         readers_fields_hash = readers_schema.fields_hash
         read_record = {}
         writers_schema.fields.each do |field|
-          if readers_field = readers_fields_hash[field.name]
+          readers_field = readers_fields_hash[field.name]
+          if readers_field
             field_val = read_data(field.type, readers_field.type, decoder)
             read_record[field.name] = field_val
+          elsif readers_schema.fields_by_alias.key?(field.name)
+            readers_field = readers_schema.fields_by_alias[field.name]
+            field_val = read_data(field.type, readers_field.type, decoder)
+            read_record[readers_field.name] = field_val
           else
             skip_data(field.type, decoder)
           end
         end
 
         # fill in the default values
-        if readers_fields_hash.size > read_record.size
-          writers_fields_hash = writers_schema.fields_hash
-          readers_fields_hash.each do |field_name, field|
-            unless writers_fields_hash.has_key? field_name
-              if !field.default.nil?
-                field_val = read_default_value(field.type, field.default)
-                read_record[field.name] = field_val
-              else
-                # FIXME(jmhodges) another 'unset' here
-              end
-            end
+        readers_fields_hash.each do |field_name, field|
+          next if read_record.key?(field_name)
+
+          if field.default?
+            field_val = read_default_value(field.type, field.default)
+            read_record[field.name] = field_val
+          else
+            raise AvroError, "Missing data for #{field.type} with no default"
           end
         end
 
@@ -412,33 +394,31 @@ module Avro
         end
 
         # Basically a JSON Decoder?
-        case field_schema.type_sym
+        datum = case field_schema.type_sym
         when :null
-          return nil
-        when :boolean
-          return default_value
+          nil
         when :int, :long
-          return Integer(default_value)
+          Integer(default_value)
         when :float, :double
-          return Float(default_value)
-        when :enum, :fixed, :string, :bytes
-          return default_value
+          Float(default_value)
+        when :boolean, :enum, :fixed, :string, :bytes
+          default_value
         when :array
           read_array = []
           default_value.each do |json_val|
             item_val = read_default_value(field_schema.items, json_val)
             read_array << item_val
           end
-          return read_array
+          read_array
         when :map
           read_map = {}
           default_value.each do |key, json_val|
             map_val = read_default_value(field_schema.values, json_val)
             read_map[key] = map_val
           end
-          return read_map
+          read_map
         when :union
-          return read_default_value(field_schema.schemas[0], default_value)
+          read_default_value(field_schema.schemas[0], default_value)
         when :record, :error
           read_record = {}
           field_schema.fields.each do |field|
@@ -447,11 +427,13 @@ module Avro
             field_val = read_default_value(field.type, json_val)
             read_record[field.name] = field_val
           end
-          return read_record
+          read_record
         else
           fail_msg = "Unknown type: #{field_schema.type}"
           raise AvroError, fail_msg
         end
+
+        field_schema.type_adapter.decode(datum)
       end
 
       def skip_data(writers_schema, decoder)
@@ -493,7 +475,7 @@ module Avro
         decoder.skip(writers_schema.size)
       end
 
-      def skip_enum(writers_schema, decoder)
+      def skip_enum(_writers_schema, decoder)
         decoder.skip_int
       end
 
@@ -524,7 +506,7 @@ module Avro
           if block_count < 0
             decoder.skip(decoder.read_long)
           else
-            block_count.times &blk
+            block_count.times(&blk)
           end
           block_count = decoder.read_long
         end
@@ -533,6 +515,8 @@ module Avro
 
     # DatumWriter for generic ruby objects
     class DatumWriter
+      VALIDATION_OPTIONS = { recursive: false, encoded: true }.freeze
+
       attr_accessor :writers_schema
       def initialize(writers_schema=nil)
         @writers_schema = writers_schema
@@ -542,8 +526,10 @@ module Avro
         write_data(writers_schema, datum, encoder)
       end
 
-      def write_data(writers_schema, datum, encoder)
-        unless Schema.validate(writers_schema, datum)
+      def write_data(writers_schema, logical_datum, encoder)
+        datum = writers_schema.type_adapter.encode(logical_datum)
+
+        unless Schema.validate(writers_schema, datum, VALIDATION_OPTIONS)
           raise AvroTypeError.new(writers_schema, datum)
         end
 
@@ -568,7 +554,7 @@ module Avro
         end
       end
 
-      def write_fixed(writers_schema, datum, encoder)
+      def write_fixed(_writers_schema, datum, encoder)
         encoder.write(datum)
       end
 
@@ -578,6 +564,7 @@ module Avro
       end
 
       def write_array(writers_schema, datum, encoder)
+        raise AvroTypeError.new(writers_schema, datum) unless datum.is_a?(Array)
         if datum.size > 0
           encoder.write_long(datum.size)
           datum.each do |item|
@@ -588,6 +575,7 @@ module Avro
       end
 
       def write_map(writers_schema, datum, encoder)
+        raise AvroTypeError.new(writers_schema, datum) unless datum.is_a?(Hash)
         if datum.size > 0
           encoder.write_long(datum.size)
           datum.each do |k,v|
@@ -599,19 +587,23 @@ module Avro
       end
 
       def write_union(writers_schema, datum, encoder)
-        index_of_schema = -1
-        found = writers_schema.schemas.
-          find{|e| index_of_schema += 1; found = Schema.validate(e, datum) }
-        unless found  # Because find_index doesn't exist in 1.8.6
+        index_of_schema = writers_schema.schemas.find_index do |schema|
+          # Optimize away expensive validation calls for the common null type
+          schema.type_sym == :null ? datum.nil? : Schema.validate(schema, datum)
+        end
+
+        unless index_of_schema
           raise AvroTypeError.new(writers_schema, datum)
         end
+
         encoder.write_long(index_of_schema)
         write_data(writers_schema.schemas[index_of_schema], datum, encoder)
       end
 
       def write_record(writers_schema, datum, encoder)
+        raise AvroTypeError.new(writers_schema, datum) unless datum.is_a?(Hash)
         writers_schema.fields.each do |field|
-          write_data(field.type, datum[field.name], encoder)
+          write_data(field.type, datum.key?(field.name) ? datum[field.name] : datum[field.name.to_sym], encoder)
         end
       end
     end # DatumWriter

@@ -9,7 +9,7 @@
  *  "License"); you may not use this file except in compliance
  *  with the License.  You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ *  https://www.apache.org/licenses/LICENSE-2.0
  *
  *  Unless required by applicable law or agreed to in writing, software
  *  distributed under the License is distributed on an "AS IS" BASIS,
@@ -130,7 +130,7 @@ function abstractFunction() { throw new Error('abstract'); }
 /**
  * Generator of random things.
  *
- * Inspired by: http://stackoverflow.com/a/424445/1062617
+ * Inspired by: https://stackoverflow.com/a/424445/1062617
  *
  */
 function Lcg(seed) {
@@ -140,7 +140,10 @@ function Lcg(seed) {
   var state = Math.floor(seed || Math.random() * (m - 1));
 
   this._max = m;
-  this._nextInt = function () { return state = (a * state + c) % m; };
+  this._nextInt = function () {
+    state = (a * state + c) % m;
+    return state;
+  };
 }
 
 Lcg.prototype.nextBoolean = function () {
@@ -195,7 +198,7 @@ Lcg.prototype.nextBuffer = function (len) {
   for (i = 0; i < len; i++) {
     arr.push(this.nextInt(256));
   }
-  return new Buffer(arr);
+  return Buffer.from(arr);
 };
 
 Lcg.prototype.choice = function (arr) {
@@ -420,7 +423,7 @@ Tap.prototype.readFixed = function (len) {
   if (this.pos > this.buf.length) {
     return;
   }
-  var fixed = new Buffer(len);
+  var fixed = Buffer.alloc(len);
   this.buf.copy(fixed, 0, pos, pos + len);
   return fixed;
 };
@@ -487,7 +490,7 @@ Tap.prototype.writeBinary = function (str, len) {
   if (this.pos > this.buf.length) {
     return;
   }
-  this.buf.binaryWrite(str, pos, len);
+  this.buf.write(str, pos, len, 'binary');
 };
 
 // Binary comparison methods.
@@ -543,7 +546,7 @@ Tap.prototype.matchBytes = Tap.prototype.matchString = function (tap) {
 // worry about Avro's zigzag encoding, we directly expose longs as unpacked.
 
 Tap.prototype.unpackLongBytes = function () {
-  var res = new Buffer(8);
+  var res = Buffer.alloc(8);
   var n = 0;
   var i = 0; // Byte index in target buffer.
   var j = 6; // Bit offset in current target buffer byte.

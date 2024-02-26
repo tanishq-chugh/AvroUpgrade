@@ -7,7 +7,7 @@
    (the "License"); you may not use this file except in compliance with
    the License.  You may obtain a copy of the License at
 
-       http://www.apache.org/licenses/LICENSE-2.0
+       https://www.apache.org/licenses/LICENSE-2.0
 
    Unless required by applicable law or agreed to in writing, software
    distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,23 +23,24 @@
   <parent>
     <artifactId>avro-parent</artifactId>
     <groupId>org.apache.avro</groupId>
-    <version>1.8.2.7.3.0.0-SNAPSHOT</version>
+    <version>1.11.3</version>
     <relativePath>../</relativePath>
   </parent>
 
   <artifactId>avro</artifactId>
 
   <name>Apache Avro</name>
-  <url>http://avro.apache.org</url>
+  <url>https://avro.apache.org</url>
   <description>Avro core components</description>
   <packaging>bundle</packaging>
 
   <properties>
+    <main.basedir>${project.parent.parent.basedir}</main.basedir>
     <osgi.import>
       !org.apache.avro*,
-      com.thoughtworks.paranamer,
-      org.codehaus.jackson*,
+      com.fasterxml.jackson*,
       org.xerial.snappy;resolution:=optional,
+      sun.misc;resolution:=optional,
       *
     </osgi.import>
     <osgi.export>org.apache.avro*;version="${project.version}"</osgi.export>
@@ -56,31 +57,46 @@
     </resources>
     <plugins>
       <plugin>
-        <groupId>com.thoughtworks.paranamer</groupId>
-        <artifactId>paranamer-maven-plugin</artifactId>
-        <version>${paranamer.version}</version>
-        <executions>
-          <execution>
-            <id>paranamer-test</id>
-            <configuration>
-              <sourceDirectory>${project.build.testSourceDirectory}</sourceDirectory>
-              <outputDirectory>${project.build.testOutputDirectory}</outputDirectory>
-            </configuration>
-            <phase>process-test-classes</phase>
-            <goals>
-              <goal>generate</goal>
-            </goals>
-          </execution>
-        </executions>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <archive>
+            <manifestEntries>
+              <Automatic-Module-Name>org.apache.avro</Automatic-Module-Name>
+            </manifestEntries>
+          </archive>
+        </configuration>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-jar-plugin</artifactId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <parallel>none</parallel>
+        </configuration>
         <executions>
           <execution>
+            <id>test-with-custom-coders</id>
+            <phase>test</phase>
             <goals>
-              <goal>test-jar</goal>
+              <goal>test</goal>
             </goals>
+            <configuration>
+              <systemPropertyVariables>
+                <org.apache.avro.specific.use_custom_coders>true</org.apache.avro.specific.use_custom_coders>
+              </systemPropertyVariables>
+            </configuration>
+          </execution>
+          <execution>
+            <id>test-with-fast-reader</id>
+            <phase>test</phase>
+            <goals>
+              <goal>test</goal>
+            </goals>
+            <configuration>
+              <systemPropertyVariables>
+                <org.apache.avro.fastread>true</org.apache.avro.fastread>
+              </systemPropertyVariables>
+            </configuration>
           </execution>
         </executions>
       </plugin>
@@ -105,7 +121,7 @@
                 <id>interop-generate-null-codec</id>
                 <phase>generate-resources</phase>
                 <configuration>
-                  <mainClass>org.apache.avro.RandomData</mainClass>
+                  <mainClass>org.apache.avro.util.RandomData</mainClass>
                   <classpathScope>test</classpathScope>
                   <arguments>
                     <argument>../../../share/test/schemas/interop.avsc</argument>
@@ -115,18 +131,83 @@
                 </configuration>
                 <goals><goal>java</goal></goals>
               </execution>
+
               <!-- Generate random data for interop tests, using deflate codec -->
               <execution>
                 <id>interop-generate-deflate-codec</id>
                 <phase>generate-resources</phase>
                 <configuration>
-                  <mainClass>org.apache.avro.RandomData</mainClass>
+                  <mainClass>org.apache.avro.util.RandomData</mainClass>
                   <classpathScope>test</classpathScope>
                   <arguments>
                     <argument>../../../share/test/schemas/interop.avsc</argument>
                     <argument>../../../build/interop/data/java_deflate.avro</argument>
                     <argument>100</argument>
                     <argument>deflate</argument>
+                  </arguments>
+                </configuration>
+                <goals><goal>java</goal></goals>
+              </execution>
+
+              <!-- Generate random data for interop tests, using snappy codec -->
+              <execution>
+                <id>interop-generate-snappy-codec</id>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <mainClass>org.apache.avro.util.RandomData</mainClass>
+                  <arguments>
+                    <argument>../../../share/test/schemas/interop.avsc</argument>
+                    <argument>../../../build/interop/data/java_snappy.avro</argument>
+                    <argument>100</argument>
+                    <argument>snappy</argument>
+                  </arguments>
+                </configuration>
+                <goals><goal>java</goal></goals>
+              </execution>
+
+              <!-- Generate random data for interop tests, using bzip2 codec -->
+              <execution>
+                <id>interop-generate-bzip2-codec</id>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <mainClass>org.apache.avro.util.RandomData</mainClass>
+                  <arguments>
+                    <argument>../../../share/test/schemas/interop.avsc</argument>
+                    <argument>../../../build/interop/data/java_bzip2.avro</argument>
+                    <argument>100</argument>
+                    <argument>bzip2</argument>
+                  </arguments>
+                </configuration>
+                <goals><goal>java</goal></goals>
+              </execution>
+
+              <!-- Generate random data for interop tests, using xz codec -->
+              <execution>
+                <id>interop-generate-xz-codec</id>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <mainClass>org.apache.avro.util.RandomData</mainClass>
+                  <arguments>
+                    <argument>../../../share/test/schemas/interop.avsc</argument>
+                    <argument>../../../build/interop/data/java_xz.avro</argument>
+                    <argument>100</argument>
+                    <argument>xz</argument>
+                  </arguments>
+                </configuration>
+                <goals><goal>java</goal></goals>
+              </execution>
+
+              <!-- Generate random data for interop tests, using zstandard codec -->
+              <execution>
+                <id>interop-generate-zstandard-codec</id>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <mainClass>org.apache.avro.util.RandomData</mainClass>
+                  <arguments>
+                    <argument>../../../share/test/schemas/interop.avsc</argument>
+                    <argument>../../../build/interop/data/java_zstandard.avro</argument>
+                    <argument>100</argument>
+                    <argument>zstandard</argument>
                   </arguments>
                 </configuration>
                 <goals><goal>java</goal></goals>
@@ -140,20 +221,21 @@
 
   <dependencies>
     <dependency>
-      <groupId>org.codehaus.jackson</groupId>
-      <artifactId>jackson-core-asl</artifactId>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-core</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.codehaus.jackson</groupId>
-      <artifactId>jackson-mapper-asl</artifactId>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.thoughtworks.paranamer</groupId>
-      <artifactId>paranamer</artifactId>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-compress</artifactId>
     </dependency>
     <dependency>
       <groupId>org.xerial.snappy</groupId>
       <artifactId>snappy-java</artifactId>
+        <optional>true</optional>
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
@@ -165,15 +247,14 @@
       <version>${tukaani.version}</version>
     </dependency>
     <dependency>
-      <groupId>joda-time</groupId>
-      <artifactId>joda-time</artifactId>
+      <groupId>com.github.luben</groupId>
+      <artifactId>zstd-jni</artifactId>
       <optional>true</optional>
     </dependency>
     <dependency>
       <groupId>org.hamcrest</groupId>
-      <artifactId>hamcrest-all</artifactId>
+      <artifactId>hamcrest-library</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>
 </project>
-

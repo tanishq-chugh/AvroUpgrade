@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,14 +16,13 @@
  * limitations under the License.
  */
 
-#include <iostream>
 #include <fstream>
+#include <iostream>
 
 #include "Compiler.hh"
 #include "ValidSchema.hh"
 
-int main(int argc, char** argv)
-{
+int main(int argc, char **argv) {
     int ret = 0;
     try {
         avro::ValidSchema schema;
@@ -40,8 +39,7 @@ int main(int argc, char** argv)
         } else {
             schema.toFlatList(std::cout);
         }
-    }
-    catch (std::exception &e) {
+    } catch (std::exception &e) {
         std::cerr << "Failed to parse or compile schema: " << e.what() << std::endl;
         ret = 1;
     }

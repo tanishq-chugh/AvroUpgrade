@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +15,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-using System;
-using System.IO;
 
 namespace Avro.IO
 {
@@ -84,7 +82,7 @@ namespace Avro.IO
         /// items from Avro array. This returns the number of entries in the initial chunk. After consuming
         /// the chunk, the client should call ReadArrayNext() to get the number of entries in the next
         /// chunk. The client should repeat the procedure until there are no more entries in the array.
-        /// 
+        ///
         /// for (int n = decoder.ReadArrayStart(); n > 0; n = decoder.ReadArrayNext())
         /// {
         ///     // Read one array entry.
@@ -102,7 +100,7 @@ namespace Avro.IO
         /// <summary>
         /// Starts reading the map Avro type. This, together with ReadMapNext() is used to read the
         /// entries from Avro map. This returns the number of entries in the initial chunk. After consuming
-        /// the chunk, the client should call ReadMapNext() to get the number of entriess in the next
+        /// the chunk, the client should call ReadMapNext() to get the number of entries in the next
         /// chunk. The client should repeat the procedure until there are no more entries in the array.
         /// for (int n = decoder.ReadMapStart(); n > 0; n = decoder.ReadMapNext())
         /// {
@@ -152,7 +150,7 @@ namespace Avro.IO
         ///  Skips a int Avro type on the stream.
         /// </summary>
         void SkipInt();
-        
+
         /// <summary>
         ///  Skips a long Avro type on the stream.
         /// </summary>
@@ -178,10 +176,20 @@ namespace Avro.IO
         /// </summary>
         void SkipString();
 
+        /// <summary>
+        /// Skips an enumeration.
+        /// </summary>
         void SkipEnum();
 
+        /// <summary>
+        /// Skips a union tag index.
+        /// </summary>
         void SkipUnionIndex();
 
+        /// <summary>
+        /// Skips a fixed of a specified length.
+        /// </summary>
+        /// <param name="len">Length of the fixed.</param>
         void SkipFixed(int len);
     }
 

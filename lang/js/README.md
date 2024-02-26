@@ -7,7 +7,7 @@ to you under the Apache License, Version 2.0 (the
 "License"); you may not use this file except in compliance
 with the License.  You may obtain a copy of the License at
 
-http://www.apache.org/licenses/LICENSE-2.0
+https://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -95,6 +95,47 @@ var avro = require('avro-js');
   avro.createFileDecoder('./records.avro')
     .on('metadata', function (type) { /* `type` is the writer's type. */ })
     .on('data', function (record) { /* Do something with the record. */ });
+  ```
+
++ Implement recursive schemata (due to lack of duck-typing):
+
+  ```javascript
+    // example type: linked list with one long-int as element value
+    const recursiveRecordType =  avro.parse({
+      "type": "record",
+      "name": "LongList",
+      "fields" : [
+        {"name": "value", "type": "long"},             
+        {"name": "next", "type": ["null", "LongList"]} // optional next element via recursion
+      ]
+    });
+
+    // will work
+    const validRecursiveRecordDTO = {
+      value: 1,
+      next: {
+        // no duck-typing support: from first nested level on the 
+        // recursive type has to be explicitly specified.
+        LongList: {
+          value: 2,
+          next: null
+        }
+      }
+    };
+    const serializedValid = recursiveRecordType.parse(validRecursiveRecordDTO);
+    
+
+    // will throw error
+    const invalidRecursiveRecordDTO = {
+      value: 1,
+      next: {
+          value: 2,
+          next: null
+      }
+    };
+    const serializedInvalid = recursiveRecordType.parse(invalidRecursiveRecordDTO);
+
+
   ```
 
 

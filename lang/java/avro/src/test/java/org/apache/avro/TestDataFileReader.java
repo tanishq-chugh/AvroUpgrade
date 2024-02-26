@@ -18,12 +18,23 @@
 package org.apache.avro;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 
+import java.io.IOException;
 import java.io.EOFException;
 import java.io.File;
-import java.io.IOException;
+import java.io.FileInputStream;
+import java.io.FileWriter;
+
+import java.lang.management.ManagementFactory;
+import java.lang.management.OperatingSystemMXBean;
 import java.nio.file.Files;
+
+import java.nio.file.Path;
+
+import com.sun.management.UnixOperatingSystemMXBean;
 import org.apache.avro.file.DataFileReader;
+import org.apache.avro.file.DataFileStream;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.file.FileReader;
 import org.apache.avro.file.SeekableFileInput;
@@ -32,8 +43,46 @@ import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.junit.Test;
 
-@SuppressWarnings("restriction")
 public class TestDataFileReader {
+
+  @Test
+  // regression test for bug AVRO-2286
+  public void testForLeakingFileDescriptors() throws IOException {
+    StringBuilder sb = new StringBuilder();
+    int maxTries = 3;
+    for (int tries = 0; tries < maxTries; tries++) {
+      Path emptyFile = Files.createTempFile("empty", ".avro");
+      Files.deleteIfExists(emptyFile);
+      Files.createFile(emptyFile);
+
+      long openFilesBeforeOperation = getNumberOfOpenFileDescriptors();
+      try (DataFileReader<Object> reader = new DataFileReader<>(emptyFile.toFile(), new GenericDatumReader<>())) {
+        fail("Reading on empty file is supposed to fail.");
+      } catch (IOException e) {
+        // everything going as supposed to
+      }
+      Files.delete(emptyFile);
+
+      long openFilesAfterOperation = getNumberOfOpenFileDescriptors();
+      if (openFilesBeforeOperation == openFilesAfterOperation)
+        return;
+
+      // Sometimes the number of file descriptors is off due to other processes or
+      // garbage
+      // collection. We note each inconsistency and retry.
+      sb.append(openFilesBeforeOperation).append("!=").append(openFilesAfterOperation).append(",");
+    }
+    fail("File descriptor leaked from new DataFileReader() over " + maxTries + " tries: ("
+        + sb.substring(0, sb.length() - 1) + ")");
+  }
+
+  private long getNumberOfOpenFileDescriptors() {
+    OperatingSystemMXBean osMxBean = ManagementFactory.getOperatingSystemMXBean();
+    if (osMxBean instanceof UnixOperatingSystemMXBean) {
+      return ((UnixOperatingSystemMXBean) osMxBean).getOpenFileDescriptorCount();
+    }
+    return 0;
+  }
 
   @Test
   // regression test for bug AVRO-2944
@@ -143,4 +192,45 @@ public class TestDataFileReader {
     };
   }
 
+  @Test
+  public void testIgnoreSchemaValidationOnRead() throws IOException {
+    // This schema has an accent in the name and the default for the field doesn't
+    // match the first type in the union. A Java SDK in the past could create a file
+    // containing this schema.
+    Schema legacySchema = new Schema.Parser().setValidate(false).setValidateDefaults(false)
+        .parse("{\"type\": \"record\", \"name\": \"InvalidAccëntWithInvalidNull\", \"fields\": "
+            + "[ {\"name\": \"id\", \"type\": [\"long\", \"null\"], \"default\": null}]}");
+
+    // Create a file with the legacy schema.
+    File f = Files.createTempFile("testIgnoreSchemaValidationOnRead", ".avro").toFile();
+    try (DataFileWriter<?> w = new DataFileWriter<>(new GenericDatumWriter<>())) {
+      w.create(legacySchema, f);
+      w.flush();
+    }
+
+    // This should not throw an exception.
+    try (DataFileStream<Void> r = new DataFileStream<>(new FileInputStream(f), new GenericDatumReader<>())) {
+      assertEquals(legacySchema, r.getSchema());
+    }
+  }
+
+  @Test(expected = InvalidAvroMagicException.class)
+  public void testInvalidMagicLength() throws IOException {
+    File f = Files.createTempFile("testInvalidMagicLength", ".avro").toFile();
+    try (FileWriter w = new FileWriter(f)) {
+      w.write("-");
+    }
+
+    DataFileReader.openReader(new SeekableFileInput(f), new GenericDatumReader<>());
+  }
+
+  @Test(expected = InvalidAvroMagicException.class)
+  public void testInvalidMagicBytes() throws IOException {
+    File f = Files.createTempFile("testInvalidMagicBytes", ".avro").toFile();
+    try (FileWriter w = new FileWriter(f)) {
+      w.write("invalid");
+    }
+
+    DataFileReader.openReader(new SeekableFileInput(f), new GenericDatumReader<>());
+  }
 }

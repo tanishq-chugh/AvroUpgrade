@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,83 +16,77 @@
  * limitations under the License.
  */
 
+#include <utility>
 
 #include "Schema.hh"
+#include "CustomAttributes.hh"
 
 namespace avro {
 
-Schema::Schema() 
-{ }
-
-Schema::~Schema() 
-{ }
-
-Schema::Schema(const NodePtr &node) :
-    node_(node)
-{ }
-
-Schema::Schema(Node *node) :
-    node_(node)
-{ }
-
-RecordSchema::RecordSchema(const std::string &name) :
-    Schema(new NodeRecord)
-{
-    node_->setName(name);
+RecordSchema::RecordSchema(const std::string &name) : Schema(new NodeRecord) {
+    node_->setName(Name(name));
 }
 
-void
-RecordSchema::addField(const std::string &name, const Schema &fieldSchema) 
-{
+void RecordSchema::addField(const std::string &name, const Schema &fieldSchema) {
+    const CustomAttributes emptyCustomAttribute;
+    addField(name, fieldSchema, emptyCustomAttribute);
+}
+
+void RecordSchema::addField(const std::string &name, const Schema &fieldSchema, const CustomAttributes &customFields) {
     // add the name first. it will throw if the name is a duplicate, preventing
     // the leaf from being added
     node_->addName(name);
 
     node_->addLeaf(fieldSchema.root());
+
+    node_->addCustomAttributesForField(customFields);
 }
 
-EnumSchema::EnumSchema(const std::string &name) :
-    Schema(new NodeEnum)
-{
-    node_->setName(name);
+std::string RecordSchema::getDoc() const {
+    return node_->getDoc();
+}
+void RecordSchema::setDoc(const std::string &doc) {
+    node_->setDoc(doc);
 }
 
-void
-EnumSchema::addSymbol(const std::string &symbol)
-{
+EnumSchema::EnumSchema(const std::string &name) : Schema(new NodeEnum) {
+    node_->setName(Name(name));
+}
+
+void EnumSchema::addSymbol(const std::string &symbol) {
     node_->addName(symbol);
 }
 
-ArraySchema::ArraySchema(const Schema &itemsSchema) :
-    Schema(new NodeArray)
-{
+ArraySchema::ArraySchema(const Schema &itemsSchema) : Schema(new NodeArray) {
     node_->addLeaf(itemsSchema.root());
 }
 
-MapSchema::MapSchema(const Schema &valuesSchema) :
-    Schema(new NodeMap)
-{
+ArraySchema::ArraySchema(const ArraySchema &itemsSchema) : Schema(new NodeArray) {
+    node_->addLeaf(itemsSchema.root());
+}
+
+MapSchema::MapSchema(const Schema &valuesSchema) : Schema(new NodeMap) {
     node_->addLeaf(valuesSchema.root());
 }
 
-UnionSchema::UnionSchema() :
-    Schema(new NodeUnion)
-{ }
+MapSchema::MapSchema(const MapSchema &valuesSchema) : Schema(new NodeMap) {
+    node_->addLeaf(valuesSchema.root());
+}
 
-void
-UnionSchema::addType(const Schema &typeSchema) 
-{
-    if(typeSchema.type() == AVRO_UNION) {
+UnionSchema::UnionSchema() : Schema(new NodeUnion) {}
+
+void UnionSchema::addType(const Schema &typeSchema) {
+    if (typeSchema.type() == AVRO_UNION) {
         throw Exception("Cannot add unions to unions");
     }
 
-    if(typeSchema.type() == AVRO_RECORD) {
+    if (typeSchema.type() == AVRO_RECORD) {
         // check for duplicate records
         size_t types = node_->leaves();
-        for(size_t i = 0; i < types; ++i) {
+        for (size_t i = 0; i < types; ++i) {
             const NodePtr &leaf = node_->leafAt(i);
             // TODO, more checks?
-            if(leaf->type() == AVRO_RECORD && leaf->name() == typeSchema.root()->name()) {
+            if (leaf->type() == AVRO_RECORD && leaf->name() == typeSchema.root()->name()) {
                 throw Exception("Records in unions cannot have duplicate names");
             }
         }
@@ -101,18 +95,12 @@ UnionSchema::addType(const Schema &typeSchema)
     node_->addLeaf(typeSchema.root());
 }
 
-FixedSchema::FixedSchema(int size, const std::string &name) :
-    Schema(new NodeFixed)
-{
+FixedSchema::FixedSchema(int size, const std::string &name) : Schema(new NodeFixed) {
     node_->setFixedSize(size);
-    node_->setName(name);
+    node_->setName(Name(name));
 }
 
-SymbolicSchema::SymbolicSchema(const Name &name, const NodePtr& link) :
-    Schema(new NodeSymbolic(HasName(name), link))
-{
+SymbolicSchema::SymbolicSchema(const Name &name, const NodePtr &link) : Schema(new NodeSymbolic(HasName(name), link)) {
 }
-
-
 
 } // namespace avro

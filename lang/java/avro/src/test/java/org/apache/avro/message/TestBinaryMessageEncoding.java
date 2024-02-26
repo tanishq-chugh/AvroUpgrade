@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *   https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
@@ -20,8 +20,11 @@
 package org.apache.avro.message;
 
 import java.nio.ByteBuffer;
-import java.util.*;
-
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import org.apache.avro.AvroRuntimeException;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
@@ -32,38 +35,25 @@ import org.junit.Assert;
 import org.junit.Test;
 
 public class TestBinaryMessageEncoding {
-  private static final Schema SCHEMA_V1 = SchemaBuilder.record("TestRecord")
-      .fields()
-      .requiredInt("id")
-      .optionalString("msg")
-      .endRecord();
+  private static final Schema SCHEMA_V1 = SchemaBuilder.record("TestRecord").fields().requiredInt("id")
+      .optionalString("msg").endRecord();
 
-  private static final GenericRecordBuilder V1_BUILDER =
-      new GenericRecordBuilder(SCHEMA_V1);
+  private static final GenericRecordBuilder V1_BUILDER = new GenericRecordBuilder(SCHEMA_V1);
 
-  private static final List<Record> V1_RECORDS = Arrays.asList(
-      V1_BUILDER.set("id", 1).set("msg", "m-1").build(),
-      V1_BUILDER.set("id", 2).set("msg", "m-2").build(),
-      V1_BUILDER.set("id", 4).set("msg", "m-4").build(),
-      V1_BUILDER.set("id", 6).set("msg", "m-6").build()
-  );
+  private static final List<Record> V1_RECORDS = Arrays.asList(V1_BUILDER.set("id", 1).set("msg", "m-1").build(),
+      V1_BUILDER.set("id", 2).set("msg", "m-2").build(), V1_BUILDER.set("id", 4).set("msg", "m-4").build(),
+      V1_BUILDER.set("id", 6).set("msg", "m-6").build());
 
-  private static final Schema SCHEMA_V2 = SchemaBuilder.record("TestRecord")
-      .fields()
-      .requiredLong("id")
-      .name("message").aliases("msg").type().optional().stringType()
-      .optionalDouble("data")
-      .endRecord();
+  private static final Schema SCHEMA_V2 = SchemaBuilder.record("TestRecord").fields().requiredLong("id").name("message")
+      .aliases("msg").type().optional().stringType().optionalDouble("data").endRecord();
 
-  private static final GenericRecordBuilder V2_BUILDER =
-      new GenericRecordBuilder(SCHEMA_V2);
+  private static final GenericRecordBuilder V2_BUILDER = new GenericRecordBuilder(SCHEMA_V2);
 
   private static final List<Record> V2_RECORDS = Arrays.asList(
       V2_BUILDER.set("id", 3L).set("message", "m-3").set("data", 12.3).build(),
       V2_BUILDER.set("id", 5L).set("message", "m-5").set("data", 23.4).build(),
       V2_BUILDER.set("id", 7L).set("message", "m-7").set("data", 34.5).build(),
-      V2_BUILDER.set("id", 8L).set("message", "m-8").set("data", 35.6).build()
-  );
+      V2_BUILDER.set("id", 8L).set("message", "m-8").set("data", 35.6).build());
 
   @Test
   public void testByteBufferRoundTrip() throws Exception {
@@ -88,7 +78,7 @@ public class TestBinaryMessageEncoding {
     MessageEncoder<Record> v2Encoder = new BinaryMessageEncoder<>(GenericData.get(), SCHEMA_V2);
 
     for (Record record : records) {
-      if (record.getSchema() == SCHEMA_V1) {
+      if (record.getSchema().equals(SCHEMA_V1)) {
         buffers.add(v1Encoder.encode(record));
       } else {
         buffers.add(v2Encoder.encode(record));
@@ -133,9 +123,7 @@ public class TestBinaryMessageEncoding {
 
     Record record = v2Decoder.decode(v1Buffer);
 
-    Assert.assertEquals(
-        V2_BUILDER.set("id", 6L).set("message", "m-6").clear("data").build(),
-        record);
+    Assert.assertEquals(V2_BUILDER.set("id", 6L).set("message", "m-6").clear("data").build(), record);
   }
 
   @Test
@@ -150,9 +138,24 @@ public class TestBinaryMessageEncoding {
 
     Record record = v2Decoder.decode(v1Buffer);
 
-    Assert.assertEquals(
-        V2_BUILDER.set("id", 4L).set("message", "m-4").clear("data").build(),
-        record);
+    Assert.assertEquals(V2_BUILDER.set("id", 4L).set("message", "m-4").clear("data").build(), record);
+  }
+
+  @Test
+  public void testIdenticalReadWithSchemaFromLookup() throws Exception {
+    MessageEncoder<Record> v1Encoder = new BinaryMessageEncoder<>(GenericData.get(), SCHEMA_V1);
+
+    SchemaStore.Cache schemaCache = new SchemaStore.Cache();
+    schemaCache.addSchema(SCHEMA_V1);
+    // The null readSchema should not throw an NPE, but trigger the
+    // BinaryMessageEncoder to use the write schema as read schema
+    BinaryMessageDecoder<Record> genericDecoder = new BinaryMessageDecoder<>(GenericData.get(), null, schemaCache);
+
+    ByteBuffer v1Buffer = v1Encoder.encode(V1_RECORDS.get(2));
+
+    Record record = genericDecoder.decode(v1Buffer);
+
+    Assert.assertEquals(V1_RECORDS.get(2), record);
   }
 
   @Test
@@ -168,8 +171,7 @@ public class TestBinaryMessageEncoding {
     Assert.assertEquals(b0.array(), b1.array());
 
     MessageDecoder<Record> decoder = new BinaryMessageDecoder<>(GenericData.get(), SCHEMA_V1);
-    Assert.assertEquals("Buffer was reused, decode(b0) should be record 1",
-        V1_RECORDS.get(1), decoder.decode(b0));
+    Assert.assertEquals("Buffer was reused, decode(b0) should be record 1", V1_RECORDS.get(1), decoder.decode(b0));
   }
 
   @Test
@@ -184,8 +186,7 @@ public class TestBinaryMessageEncoding {
     MessageDecoder<Record> decoder = new BinaryMessageDecoder<>(GenericData.get(), SCHEMA_V1);
 
     // bytes are not changed by reusing the encoder
-    Assert.assertEquals("Buffer was copied, decode(b0) should be record 0",
-        V1_RECORDS.get(0), decoder.decode(b0));
+    Assert.assertEquals("Buffer was copied, decode(b0) should be record 0", V1_RECORDS.get(0), decoder.decode(b0));
   }
 
   @Test(expected = AvroRuntimeException.class)

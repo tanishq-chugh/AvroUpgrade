@@ -7,7 +7,7 @@
    (the "License"); you may not use this file except in compliance with
    the License.  You may obtain a copy of the License at
 
-       http://www.apache.org/licenses/LICENSE-2.0
+       https://www.apache.org/licenses/LICENSE-2.0
 
    Unless required by applicable law or agreed to in writing, software
    distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,8 +23,8 @@
   <parent>
     <artifactId>avro-parent</artifactId>
     <groupId>org.apache.avro</groupId>
-    <version>1.8.2.7.3.0.0-SNAPSHOT</version>
-    <relativePath>../</relativePath>
+    <version>1.11.3</version>
+    <relativePath>../pom.xml</relativePath>
   </parent>
 
   <artifactId>avro-maven-plugin</artifactId>
@@ -34,6 +34,7 @@
   <description>Maven plugin for Avro IDL and Specific API Compilers</description>
 
   <properties>
+    <main.basedir>${project.parent.parent.basedir}</main.basedir>
     <pluginTestingVersion>3.3.0</pluginTestingVersion>
   </properties>
 
@@ -42,7 +43,6 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-plugin-plugin</artifactId>
-        <version>${plugin-plugin.version}</version>
         <executions>
           <execution>
             <id>generated-helpmojo</id>
@@ -56,21 +56,31 @@
   </build>
 
   <dependencies>
-    <!-- maven -->
     <dependency>
       <groupId>org.apache.maven</groupId>
       <artifactId>maven-core</artifactId>
-      <version>${maven.version}</version>
+      <version>${maven-core.version}</version>
+      <scope>provided</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>com.google.code.findbugs</groupId>
+          <artifactId>jsr305</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <!-- Bump this to a higher version while maven 3.3.9 still uses 3.0.22 with a -->
+    <!-- XML injection vulnerability. -->
+    <dependency>
+      <groupId>org.codehaus.plexus</groupId>
+      <artifactId>plexus-utils</artifactId>
+      <version>3.5.1</version>
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.maven.shared</groupId>
       <artifactId>file-management</artifactId>
       <version>${file-management.version}</version>
       <exclusions>
-        <exclusion>
-          <groupId>org.apache.maven</groupId>
-          <artifactId>maven-plugin-api</artifactId>
-        </exclusion>
         <exclusion>
           <groupId>com.google.code.findbugs</groupId>
           <artifactId>jsr305</artifactId>
@@ -86,7 +96,7 @@
     <dependency>
       <groupId>org.apache.maven</groupId>
       <artifactId>maven-compat</artifactId>
-      <version>${maven.version}</version>
+      <version>${maven-core.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -101,6 +111,12 @@
       <version>${pluginTestingVersion}</version>
       <scope>test</scope>
     </dependency>
+      <dependency>
+          <groupId>org.apache.avro</groupId>
+          <artifactId>avro</artifactId>
+          <version>1.11.3</version>
+          <scope>compile</scope>
+      </dependency>
   </dependencies>
 
 </project>

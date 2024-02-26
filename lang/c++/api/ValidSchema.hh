@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,8 +16,8 @@
  * limitations under the License.
  */
 
-#ifndef avro_ValidSchema_hh__ 
-#define avro_ValidSchema_hh__ 
+#ifndef avro_ValidSchema_hh__
+#define avro_ValidSchema_hh__
 
 #include "Config.hh"
 #include "Node.hh"
@@ -27,7 +27,7 @@ namespace avro {
 class AVRO_DECL Schema;
 
 /// A ValidSchema is basically a non-mutable Schema that has passed some
-/// minumum of sanity checks.  Once valididated, any Schema that is part of
+/// minimum of sanity checks.  Once validated, any Schema that is part of
 /// this ValidSchema is considered locked, and cannot be modified (an attempt
 /// to modify a locked Schema will throw).  Also, as it is validated, any
 /// recursive duplications of schemas are replaced with symbolic links to the
@@ -39,7 +39,7 @@ class AVRO_DECL Schema;
 
 class AVRO_DECL ValidSchema {
 public:
-    explicit ValidSchema(const NodePtr &root);
+    explicit ValidSchema(NodePtr root);
     explicit ValidSchema(const Schema &schema);
     ValidSchema();
 
@@ -50,11 +50,15 @@ public:
     }
 
     void toJson(std::ostream &os) const;
+    std::string toJson(bool prettyPrint = true) const;
 
     void toFlatList(std::ostream &os) const;
 
-  protected:
+protected:
     NodePtr root_;
+
+private:
+    static std::string compactSchema(const std::string &schema);
 };
 
 } // namespace avro
