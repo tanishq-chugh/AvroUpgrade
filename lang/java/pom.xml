@@ -43,7 +43,7 @@
       <jackson-mapper-asl.version>1.9.13-cloudera.4</jackson-mapper-asl.version>
     -->
     <servlet-api.version>4.0.1</servlet-api.version>
-    <jetty.version>9.4.52.v20230823</jetty.version>
+    <jetty.version>9.4.54.v20240208</jetty.version>
     <jopt-simple.version>5.0.4</jopt-simple.version>
     <junit5.version>5.10.0</junit5.version>
     <netty.version>4.1.97.Final</netty.version>
