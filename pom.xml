@@ -546,7 +546,7 @@
                 <mkdir dir="${avro.distDir}/java"/>
                 <copy todir="${avro.distDir}/java" verbose="true">
                   <flattenmapper/>
-                  <fileset dir="lang/java/"
+                  <fileset dir=""
                            includes="**/target/*${project.version}*.jar"
                            excludes="**/original-*.jar **/*tests.jar"/>
                 </copy>
