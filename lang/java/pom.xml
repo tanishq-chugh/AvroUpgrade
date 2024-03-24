@@ -37,7 +37,7 @@
     <javaVersion>1.8</javaVersion>
 
     <!-- version properties for dependencies -->
-    <hadoop.version>3.3.5</hadoop.version>
+    <hadoop.version>3.4.0</hadoop.version>
     <jackson-bom.version>2.14.2</jackson-bom.version>
      <!--
       <jackson-mapper-asl.version>1.9.13-cloudera.4</jackson-mapper-asl.version>
